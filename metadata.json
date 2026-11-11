@@ -1,0 +1,6 @@
+{
+  "name": "DWELLO HOMES",
+  "description": "Property rental and house finding app for tenants and landlords in Benin City, Edo State, Nigeria.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
