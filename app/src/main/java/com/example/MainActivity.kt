@@ -46,13 +46,12 @@ import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.MessagesScreen
 import com.example.ui.screens.PostHouseScreen
 import com.example.ui.screens.ProfileScreen
-import com.example.ui.theme.ForestGreenDark
-import com.example.ui.theme.ForestGreenPrimary
-import com.example.ui.theme.LightSagePill
+import com.example.ui.theme.DeepNavyText
+import com.example.ui.theme.MainBackgroundWhite
 import com.example.ui.theme.MyApplicationTheme
-import com.example.ui.theme.SoftCreamBackground
-import com.example.ui.theme.TextPrimaryDark
-import com.example.ui.theme.TextSecondaryDark
+import com.example.ui.theme.NavyTextSecondary
+import com.example.ui.theme.SkyBluePrimary
+import com.example.ui.theme.SoftBlueAccent
 
 enum class DwelloNavScreen {
   HOME,
@@ -92,7 +91,7 @@ fun DwelloApp() {
     bottomBar = {
       NavigationBar(
         containerColor = Color.White,
-        contentColor = ForestGreenDark,
+        contentColor = DeepNavyText,
         tonalElevation = 6.dp,
         modifier = Modifier.testTag("bottom_nav_bar")
       ) {
@@ -118,11 +117,11 @@ fun DwelloApp() {
             )
           },
           colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = ForestGreenPrimary,
-            selectedTextColor = ForestGreenPrimary,
-            unselectedIconColor = TextSecondaryDark,
-            unselectedTextColor = TextSecondaryDark,
-            indicatorColor = LightSagePill
+            selectedIconColor = SkyBluePrimary,
+            selectedTextColor = SkyBluePrimary,
+            unselectedIconColor = NavyTextSecondary,
+            unselectedTextColor = NavyTextSecondary,
+            indicatorColor = SoftBlueAccent
           ),
           modifier = Modifier.testTag("nav_item_home")
         )
@@ -152,11 +151,11 @@ fun DwelloApp() {
             )
           },
           colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = ForestGreenPrimary,
-            selectedTextColor = ForestGreenPrimary,
-            unselectedIconColor = TextSecondaryDark,
-            unselectedTextColor = TextSecondaryDark,
-            indicatorColor = LightSagePill
+            selectedIconColor = SkyBluePrimary,
+            selectedTextColor = SkyBluePrimary,
+            unselectedIconColor = NavyTextSecondary,
+            unselectedTextColor = NavyTextSecondary,
+            indicatorColor = SoftBlueAccent
           ),
           modifier = Modifier.testTag("nav_item_find_houses")
         )
@@ -183,11 +182,11 @@ fun DwelloApp() {
             )
           },
           colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = ForestGreenPrimary,
-            selectedTextColor = ForestGreenPrimary,
-            unselectedIconColor = TextSecondaryDark,
-            unselectedTextColor = TextSecondaryDark,
-            indicatorColor = LightSagePill
+            selectedIconColor = SkyBluePrimary,
+            selectedTextColor = SkyBluePrimary,
+            unselectedIconColor = NavyTextSecondary,
+            unselectedTextColor = NavyTextSecondary,
+            indicatorColor = SoftBlueAccent
           ),
           modifier = Modifier.testTag("nav_item_post_house")
         )
@@ -214,11 +213,11 @@ fun DwelloApp() {
             )
           },
           colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = ForestGreenPrimary,
-            selectedTextColor = ForestGreenPrimary,
-            unselectedIconColor = TextSecondaryDark,
-            unselectedTextColor = TextSecondaryDark,
-            indicatorColor = LightSagePill
+            selectedIconColor = SkyBluePrimary,
+            selectedTextColor = SkyBluePrimary,
+            unselectedIconColor = NavyTextSecondary,
+            unselectedTextColor = NavyTextSecondary,
+            indicatorColor = SoftBlueAccent
           ),
           modifier = Modifier.testTag("nav_item_messages")
         )
@@ -245,11 +244,11 @@ fun DwelloApp() {
             )
           },
           colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = ForestGreenPrimary,
-            selectedTextColor = ForestGreenPrimary,
-            unselectedIconColor = TextSecondaryDark,
-            unselectedTextColor = TextSecondaryDark,
-            indicatorColor = LightSagePill
+            selectedIconColor = SkyBluePrimary,
+            selectedTextColor = SkyBluePrimary,
+            unselectedIconColor = NavyTextSecondary,
+            unselectedTextColor = NavyTextSecondary,
+            indicatorColor = SoftBlueAccent
           ),
           modifier = Modifier.testTag("nav_item_profile")
         )
@@ -260,7 +259,7 @@ fun DwelloApp() {
       modifier = Modifier
         .fillMaxSize()
         .padding(innerPadding)
-        .background(SoftCreamBackground)
+        .background(MainBackgroundWhite)
     ) {
       when (currentScreen) {
         DwelloNavScreen.HOME -> {

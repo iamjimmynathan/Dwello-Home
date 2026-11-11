@@ -8,45 +8,44 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val LightColorScheme = lightColorScheme(
-  primary = ForestGreenPrimary,
+  primary = SkyBluePrimary,
   onPrimary = Color.White,
-  primaryContainer = ForestGreenContainer,
-  onPrimaryContainer = OnForestGreenContainer,
-  secondary = ForestAccent,
+  primaryContainer = SoftBlueAccent,
+  onPrimaryContainer = DeepNavyText,
+  secondary = SkyBlueDark,
   onSecondary = Color.White,
-  secondaryContainer = LightSagePill,
-  onSecondaryContainer = ForestGreenDark,
-  tertiary = WarmGoldAccent,
+  secondaryContainer = VeryLightBlueBackground,
+  onSecondaryContainer = DeepNavyText,
+  tertiary = WarmAmberAccent,
   onTertiary = Color.White,
-  background = SoftCreamBackground,
-  onBackground = TextPrimaryDark,
-  surface = SoftCreamSurface,
-  onSurface = TextPrimaryDark,
-  surfaceVariant = SoftCreamBorder,
-  onSurfaceVariant = TextSecondaryDark,
-  outline = SoftCreamBorder,
+  background = MainBackgroundWhite,
+  onBackground = DeepNavyText,
+  surface = MainBackgroundWhite,
+  onSurface = DeepNavyText,
+  surfaceVariant = VeryLightBlueBackground,
+  onSurfaceVariant = NavyTextSecondary,
+  outline = CardBorderSubtle
 )
 
 private val DarkColorScheme = darkColorScheme(
-  primary = Color(0xFF67B788),
-  onPrimary = ForestGreenDark,
-  primaryContainer = ForestGreenLight,
-  onPrimaryContainer = Color.White,
-  secondary = Color(0xFF86CCA0),
-  onSecondary = ForestGreenDark,
-  background = ForestGreenDark,
-  onBackground = SoftCreamBackground,
-  surface = Color(0xFF132A1E),
-  onSurface = SoftCreamBackground,
-  surfaceVariant = Color(0xFF1C3A2B),
-  onSurfaceVariant = Color(0xFFC2D4C8),
-  outline = Color(0xFF2E533F),
+  primary = SkyBluePrimary,
+  onPrimary = Color.White,
+  primaryContainer = SkyBlueDark,
+  onPrimaryContainer = VeryLightBlueBackground,
+  secondary = SkyBlueLight,
+  onSecondary = DeepNavyText,
+  background = Color(0xFF141F29),
+  onBackground = VeryLightBlueBackground,
+  surface = Color(0xFF1B2937),
+  onSurface = VeryLightBlueBackground,
+  surfaceVariant = Color(0xFF243647),
+  onSurfaceVariant = SoftBlueAccent,
+  outline = Color(0xFF334B61)
 )
 
 @Composable
 fun MyApplicationTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
-  // Set dynamicColor to false by default so DWELLO HOMES brand colors (Dark Forest Green & Soft Cream) are always visible
   dynamicColor: Boolean = false,
   content: @Composable () -> Unit,
 ) {

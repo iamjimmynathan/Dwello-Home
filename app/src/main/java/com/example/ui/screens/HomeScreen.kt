@@ -3,6 +3,7 @@ package com.example.ui.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,11 +26,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddHome
 import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
@@ -59,8 +60,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,17 +72,17 @@ import com.example.data.DwelloStrings
 import com.example.data.PropertyItem
 import com.example.data.SamplePropertyData
 import com.example.ui.components.DwelloHeader
-import com.example.ui.theme.ForestAccent
-import com.example.ui.theme.ForestGreenContainer
-import com.example.ui.theme.ForestGreenDark
-import com.example.ui.theme.ForestGreenPrimary
-import com.example.ui.theme.LightSagePill
-import com.example.ui.theme.SoftCreamBackground
-import com.example.ui.theme.SoftCreamBorder
-import com.example.ui.theme.SoftCreamCard
-import com.example.ui.theme.TextPrimaryDark
-import com.example.ui.theme.TextSecondaryDark
-import com.example.ui.theme.WarmGoldAccent
+import com.example.ui.theme.CardBorderSubtle
+import com.example.ui.theme.CardSurfaceWhite
+import com.example.ui.theme.DeepNavyText
+import com.example.ui.theme.MainBackgroundWhite
+import com.example.ui.theme.NavyTextSecondary
+import com.example.ui.theme.SkyBlueDark
+import com.example.ui.theme.SkyBluePrimary
+import com.example.ui.theme.SoftBlueAccent
+import com.example.ui.theme.SoftBlueBorder
+import com.example.ui.theme.VeryLightBlueBackground
+import com.example.ui.theme.WarmAmberAccent
 
 @Composable
 fun HomeScreen(
@@ -99,9 +102,9 @@ fun HomeScreen(
   Column(
     modifier = modifier
       .fillMaxSize()
-      .background(SoftCreamBackground)
+      .background(MainBackgroundWhite)
   ) {
-    // 1. Header with DWELLO HOMES name, house logo, language switch, Benin City location
+    // 1. Header with Sky Blue branding
     DwelloHeader(
       currentLanguage = currentLanguage,
       onLanguageToggle = onLanguageToggle,
@@ -113,13 +116,13 @@ fun HomeScreen(
       modifier = Modifier
         .fillMaxSize()
         .testTag("home_screen_scroll"),
-      contentPadding = PaddingValues(bottom = 24.dp)
+      contentPadding = PaddingValues(bottom = 28.dp)
     ) {
-      // 2. Welcome Banner & Subtitle
+      // 2. Welcome Banner & Subtitle in Deep Navy
       item {
         Surface(
           modifier = Modifier.fillMaxWidth(),
-          color = SoftCreamBackground
+          color = MainBackgroundWhite
         ) {
           Column(
             modifier = Modifier
@@ -130,7 +133,7 @@ fun HomeScreen(
               text = DwelloStrings.homeWelcome(currentLanguage),
               style = MaterialTheme.typography.headlineMedium.copy(
                 fontWeight = FontWeight.ExtraBold,
-                color = ForestGreenDark,
+                color = DeepNavyText,
                 lineHeight = 32.sp
               ),
               modifier = Modifier.testTag("welcome_heading_text")
@@ -141,7 +144,7 @@ fun HomeScreen(
             Text(
               text = DwelloStrings.homeSubtitle(currentLanguage),
               style = MaterialTheme.typography.bodyLarge.copy(
-                color = TextSecondaryDark,
+                color = NavyTextSecondary,
                 fontWeight = FontWeight.Medium,
                 lineHeight = 22.sp
               ),
@@ -163,14 +166,14 @@ fun HomeScreen(
             placeholder = {
               Text(
                 text = DwelloStrings.searchPlaceholder(currentLanguage),
-                style = MaterialTheme.typography.bodyLarge.copy(color = TextSecondaryDark.copy(alpha = 0.7f))
+                style = MaterialTheme.typography.bodyLarge.copy(color = NavyTextSecondary.copy(alpha = 0.7f))
               )
             },
             leadingIcon = {
               Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "Search",
-                tint = ForestGreenPrimary,
+                tint = SkyBluePrimary,
                 modifier = Modifier.size(24.dp)
               )
             },
@@ -180,7 +183,7 @@ fun HomeScreen(
                   Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = "Clear",
-                    tint = TextSecondaryDark
+                    tint = NavyTextSecondary
                   )
                 }
               }
@@ -188,22 +191,22 @@ fun HomeScreen(
             singleLine = true,
             shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
-              focusedContainerColor = Color.White,
-              unfocusedContainerColor = Color.White,
-              focusedBorderColor = ForestGreenPrimary,
-              unfocusedBorderColor = SoftCreamBorder,
-              focusedTextColor = TextPrimaryDark,
-              unfocusedTextColor = TextPrimaryDark
+              focusedContainerColor = VeryLightBlueBackground,
+              unfocusedContainerColor = VeryLightBlueBackground,
+              focusedBorderColor = SkyBluePrimary,
+              unfocusedBorderColor = SoftBlueBorder,
+              focusedTextColor = DeepNavyText,
+              unfocusedTextColor = DeepNavyText
             )
           )
 
           // Area Chips (Popular in Benin City)
-          Spacer(modifier = Modifier.height(12.dp))
+          Spacer(modifier = Modifier.height(14.dp))
           Text(
             text = DwelloStrings.popularAreasTitle(currentLanguage),
             style = MaterialTheme.typography.labelLarge.copy(
               fontWeight = FontWeight.Bold,
-              color = ForestGreenDark
+              color = DeepNavyText
             )
           )
           Spacer(modifier = Modifier.height(8.dp))
@@ -224,9 +227,9 @@ fun HomeScreen(
                     }
                   }
                   .testTag("area_chip_${area.name}"),
-                color = if (isSelected) ForestGreenPrimary else Color.White,
+                color = if (isSelected) SkyBluePrimary else Color.White,
                 shape = RoundedCornerShape(20.dp),
-                border = BorderStroke(1.dp, if (isSelected) ForestGreenPrimary else SoftCreamBorder)
+                border = BorderStroke(1.dp, if (isSelected) SkyBluePrimary else SoftBlueBorder)
               ) {
                 Row(
                   modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -235,7 +238,7 @@ fun HomeScreen(
                   Icon(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = null,
-                    tint = if (isSelected) WarmGoldAccent else ForestAccent,
+                    tint = if (isSelected) Color.White else SkyBluePrimary,
                     modifier = Modifier.size(16.dp)
                   )
                   Spacer(modifier = Modifier.width(4.dp))
@@ -243,7 +246,7 @@ fun HomeScreen(
                     text = area.name,
                     style = MaterialTheme.typography.bodyMedium.copy(
                       fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                      color = if (isSelected) Color.White else TextPrimaryDark
+                      color = if (isSelected) Color.White else DeepNavyText
                     )
                   )
                 }
@@ -253,7 +256,7 @@ fun HomeScreen(
         }
       }
 
-      // 4. TWO LARGE MAIN BUTTONS: FIND A HOUSE and POST A HOUSE
+      // 4. TWO LARGE MAIN BUTTONS: FIND A HOUSE (Sky Blue) and POST A HOUSE (White with Sky Blue border)
       item {
         Spacer(modifier = Modifier.height(20.dp))
         Column(
@@ -262,7 +265,7 @@ fun HomeScreen(
             .padding(horizontal = 20.dp),
           verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-          // Large Button 1: FIND A HOUSE
+          // Large Button 1: FIND A HOUSE - Sky Blue with white text
           Button(
             onClick = { onNavigateToFindHouses(searchQuery.ifEmpty { selectedArea }) },
             modifier = Modifier
@@ -271,7 +274,7 @@ fun HomeScreen(
               .testTag("find_a_house_button"),
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(
-              containerColor = ForestGreenPrimary,
+              containerColor = SkyBluePrimary,
               contentColor = Color.White
             ),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
@@ -285,7 +288,7 @@ fun HomeScreen(
                 modifier = Modifier
                   .size(38.dp)
                   .clip(CircleShape)
-                  .background(Color.White.copy(alpha = 0.2f)),
+                  .background(Color.White.copy(alpha = 0.22f)),
                 contentAlignment = Alignment.Center
               ) {
                 Icon(
@@ -304,20 +307,21 @@ fun HomeScreen(
                   style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.5.sp,
-                    fontSize = 17.sp
+                    fontSize = 17.sp,
+                    color = Color.White
                   )
                 )
                 Text(
                   text = DwelloStrings.findHouseSubtext(currentLanguage),
                   style = MaterialTheme.typography.labelSmall.copy(
-                    color = Color.White.copy(alpha = 0.85f)
+                    color = Color.White.copy(alpha = 0.9f)
                   )
                 )
               }
             }
           }
 
-          // Large Button 2: POST A HOUSE
+          // Large Button 2: POST A HOUSE - White with Sky Blue border and blue text
           OutlinedButton(
             onClick = { onNavigateToPostHouse() },
             modifier = Modifier
@@ -325,10 +329,10 @@ fun HomeScreen(
               .height(64.dp)
               .testTag("post_a_house_button"),
             shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(2.dp, ForestGreenPrimary),
+            border = BorderStroke(2.dp, SkyBluePrimary),
             colors = ButtonDefaults.outlinedButtonColors(
               containerColor = Color.White,
-              contentColor = ForestGreenPrimary
+              contentColor = SkyBluePrimary
             )
           ) {
             Row(
@@ -340,13 +344,13 @@ fun HomeScreen(
                 modifier = Modifier
                   .size(38.dp)
                   .clip(CircleShape)
-                  .background(ForestGreenContainer),
+                  .background(SoftBlueAccent),
                 contentAlignment = Alignment.Center
               ) {
                 Icon(
                   imageVector = Icons.Default.AddHome,
                   contentDescription = null,
-                  tint = ForestGreenPrimary,
+                  tint = SkyBluePrimary,
                   modifier = Modifier.size(22.dp)
                 )
               }
@@ -360,13 +364,13 @@ fun HomeScreen(
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.5.sp,
                     fontSize = 17.sp,
-                    color = ForestGreenPrimary
+                    color = SkyBluePrimary
                   )
                 )
                 Text(
                   text = DwelloStrings.postHouseSubtext(currentLanguage),
                   style = MaterialTheme.typography.labelSmall.copy(
-                    color = TextSecondaryDark
+                    color = NavyTextSecondary
                   )
                 )
               }
@@ -389,7 +393,7 @@ fun HomeScreen(
             text = DwelloStrings.featuredTitle(currentLanguage),
             style = MaterialTheme.typography.titleMedium.copy(
               fontWeight = FontWeight.Bold,
-              color = ForestGreenDark
+              color = DeepNavyText
             )
           )
           TextButton(
@@ -398,7 +402,7 @@ fun HomeScreen(
           ) {
             Text(
               text = DwelloStrings.viewAll(currentLanguage),
-              color = ForestGreenPrimary,
+              color = SkyBluePrimary,
               fontWeight = FontWeight.Bold
             )
           }
@@ -407,8 +411,8 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(8.dp))
       }
 
-      // Property Cards
-      val displayedProperties = SamplePropertyData.sampleProperties.take(3)
+      // Property Cards with Photographs and Demonstration Disclaimer
+      val displayedProperties = SamplePropertyData.dynamicProperties.take(3)
       items(displayedProperties) { property ->
         PropertyCard(
           property = property,
@@ -422,7 +426,7 @@ fun HomeScreen(
         )
       }
 
-      // 6. Contact Section: "Need help? Contact a landlord or agent."
+      // 6. Contact Section in Light Blue background (#EAF5FF)
       item {
         Spacer(modifier = Modifier.height(20.dp))
         Card(
@@ -431,8 +435,9 @@ fun HomeScreen(
             .padding(horizontal = 20.dp)
             .testTag("help_contact_section_card"),
           shape = RoundedCornerShape(16.dp),
-          colors = CardDefaults.cardColors(containerColor = ForestGreenDark),
-          elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+          colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
+          elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+          border = BorderStroke(1.dp, SoftBlueBorder)
         ) {
           Column(
             modifier = Modifier
@@ -442,15 +447,15 @@ fun HomeScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
               Box(
                 modifier = Modifier
-                  .size(36.dp)
+                  .size(38.dp)
                   .clip(CircleShape)
-                  .background(WarmGoldAccent),
+                  .background(SkyBluePrimary),
                 contentAlignment = Alignment.Center
               ) {
                 Icon(
                   imageVector = Icons.Default.HelpOutline,
                   contentDescription = "Help",
-                  tint = ForestGreenDark,
+                  tint = Color.White,
                   modifier = Modifier.size(22.dp)
                 )
               }
@@ -462,13 +467,13 @@ fun HomeScreen(
                   text = DwelloStrings.needHelpTitle(currentLanguage),
                   style = MaterialTheme.typography.titleSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = DeepNavyText
                   )
                 )
                 Text(
                   text = DwelloStrings.needHelpSubtext(currentLanguage),
                   style = MaterialTheme.typography.bodySmall.copy(
-                    color = Color.White.copy(alpha = 0.8f)
+                    color = NavyTextSecondary
                   )
                 )
               }
@@ -491,8 +496,8 @@ fun HomeScreen(
                   .height(48.dp)
                   .testTag("call_help_desk_button"),
                 colors = ButtonDefaults.buttonColors(
-                  containerColor = Color.White,
-                  contentColor = ForestGreenDark
+                  containerColor = SkyBluePrimary,
+                  contentColor = Color.White
                 ),
                 shape = RoundedCornerShape(10.dp)
               ) {
@@ -500,7 +505,7 @@ fun HomeScreen(
                   imageVector = Icons.Default.Call,
                   contentDescription = null,
                   modifier = Modifier.size(18.dp),
-                  tint = ForestGreenDark
+                  tint = Color.White
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
@@ -517,22 +522,25 @@ fun HomeScreen(
                   .height(48.dp)
                   .testTag("whatsapp_agent_button"),
                 colors = ButtonDefaults.outlinedButtonColors(
-                  containerColor = Color.Transparent,
-                  contentColor = Color.White
+                  containerColor = Color.White,
+                  contentColor = SkyBluePrimary
                 ),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
+                border = BorderStroke(1.5.dp, SkyBluePrimary),
                 shape = RoundedCornerShape(10.dp)
               ) {
                 Icon(
                   imageVector = Icons.Default.Security,
                   contentDescription = null,
                   modifier = Modifier.size(18.dp),
-                  tint = WarmGoldAccent
+                  tint = SkyBluePrimary
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                   text = DwelloStrings.chatWhatsapp(currentLanguage),
-                  style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                  style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = SkyBluePrimary
+                  )
                 )
               }
             }
@@ -550,7 +558,7 @@ fun HomeScreen(
         Text(
           text = if (currentLanguage == AppLanguage.ENGLISH) "Select Area in Benin City" else "Pick Area for Benin City",
           fontWeight = FontWeight.Bold,
-          color = ForestGreenDark
+          color = DeepNavyText
         )
       },
       text = {
@@ -570,7 +578,7 @@ fun HomeScreen(
               Icon(
                 imageVector = Icons.Default.LocationOn,
                 contentDescription = null,
-                tint = ForestGreenPrimary,
+                tint = SkyBluePrimary,
                 modifier = Modifier.size(20.dp)
               )
               Spacer(modifier = Modifier.width(10.dp))
@@ -579,22 +587,22 @@ fun HomeScreen(
                   text = area.name,
                   style = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.SemiBold,
-                    color = TextPrimaryDark
+                    color = DeepNavyText
                   )
                 )
                 Text(
                   text = if (currentLanguage == AppLanguage.ENGLISH) area.descriptionEn else area.descriptionPidgin,
-                  style = MaterialTheme.typography.bodySmall.copy(color = TextSecondaryDark)
+                  style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
                 )
               }
             }
-            HorizontalDivider(color = SoftCreamBorder.copy(alpha = 0.5f))
+            HorizontalDivider(color = SoftBlueBorder.copy(alpha = 0.5f))
           }
         }
       },
       confirmButton = {
         TextButton(onClick = { showAreaPicker = false }) {
-          Text("Close", color = ForestGreenPrimary, fontWeight = FontWeight.Bold)
+          Text("Close", color = SkyBluePrimary, fontWeight = FontWeight.Bold)
         }
       }
     )
@@ -608,7 +616,7 @@ fun HomeScreen(
         Text(
           text = if (currentLanguage == AppLanguage.ENGLISH) "Benin City Property Support" else "Benin City Help Desk",
           fontWeight = FontWeight.Bold,
-          color = ForestGreenDark
+          color = DeepNavyText
         )
       },
       text = {
@@ -618,13 +626,13 @@ fun HomeScreen(
               "We help tenants and landlords in Benin City connect safely. You can reach our local assistance team on WhatsApp or direct call."
             else
               "We dey help tenants and landlords for Benin City connect without wahala. You fit call our team direct or chat WhatsApp anytime.",
-            style = MaterialTheme.typography.bodyMedium.copy(color = TextPrimaryDark)
+            style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText)
           )
           Spacer(modifier = Modifier.height(12.dp))
           Text(
             text = "📞 Phone: +234 800 393 556\n💬 WhatsApp: +234 803 123 4567\n📍 Benin Office: Ring Road Axis, Edo State",
             style = MaterialTheme.typography.bodySmall.copy(
-              color = ForestGreenDark,
+              color = SkyBlueDark,
               fontWeight = FontWeight.SemiBold,
               lineHeight = 20.sp
             )
@@ -638,14 +646,14 @@ fun HomeScreen(
             val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:0800393556"))
             context.startActivity(intent)
           },
-          colors = ButtonDefaults.buttonColors(containerColor = ForestGreenPrimary)
+          colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
         ) {
           Text("Call Now")
         }
       },
       dismissButton = {
         TextButton(onClick = { showHelpDialog = false }) {
-          Text("Cancel", color = TextSecondaryDark)
+          Text("Cancel", color = NavyTextSecondary)
         }
       }
     )
@@ -680,177 +688,243 @@ fun PropertyCard(
       .clickable(onClick = onClick)
       .testTag("property_card_${property.id}"),
     shape = RoundedCornerShape(16.dp),
-    colors = CardDefaults.cardColors(containerColor = SoftCreamCard),
+    colors = CardDefaults.cardColors(containerColor = CardSurfaceWhite),
     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    border = BorderStroke(1.dp, SoftCreamBorder)
+    border = BorderStroke(1.dp, CardBorderSubtle)
   ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(16.dp)
-    ) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    Column(modifier = Modifier.fillMaxWidth()) {
+      // Property Photograph Header
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(140.dp)
       ) {
-        // Location Badge
+        Image(
+          painter = painterResource(id = property.imageResId),
+          contentDescription = property.titleEn,
+          modifier = Modifier.fillMaxSize(),
+          contentScale = ContentScale.Crop
+        )
+
+        // Demonstration Data Pill
         Surface(
-          color = LightSagePill,
-          shape = RoundedCornerShape(8.dp)
+          modifier = Modifier
+            .padding(10.dp)
+            .align(Alignment.TopStart),
+          color = Color(0xCC263746),
+          shape = RoundedCornerShape(6.dp)
         ) {
           Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically
           ) {
             Icon(
-              imageVector = Icons.Default.LocationOn,
+              imageVector = Icons.Default.Info,
               contentDescription = null,
-              tint = ForestGreenPrimary,
-              modifier = Modifier.size(14.dp)
+              tint = Color.White,
+              modifier = Modifier.size(12.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-              text = property.area,
-              style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = ForestGreenDark
+              text = if (currentLanguage == AppLanguage.ENGLISH) "Demonstration Listing" else "Demo Listing",
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 10.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Medium
               )
             )
           }
         }
 
-        // Price
-        Row(verticalAlignment = Alignment.Bottom) {
-          Text(
-            text = property.priceFormatted,
-            style = MaterialTheme.typography.titleMedium.copy(
-              fontWeight = FontWeight.ExtraBold,
-              color = ForestGreenPrimary
-            )
-          )
-          Text(
-            text = DwelloStrings.perYear(currentLanguage),
-            style = MaterialTheme.typography.labelSmall.copy(
-              color = TextSecondaryDark
-            )
-          )
-        }
-      }
-
-      Spacer(modifier = Modifier.height(10.dp))
-
-      // Title
-      Text(
-        text = if (currentLanguage == AppLanguage.ENGLISH) property.titleEn else property.titlePidgin,
-        style = MaterialTheme.typography.titleSmall.copy(
-          fontWeight = FontWeight.Bold,
-          color = TextPrimaryDark,
-          fontSize = 16.sp
-        )
-      )
-
-      Spacer(modifier = Modifier.height(4.dp))
-
-      Text(
-        text = if (currentLanguage == AppLanguage.ENGLISH) property.descriptionEn else property.descriptionPidgin,
-        style = MaterialTheme.typography.bodySmall.copy(
-          color = TextSecondaryDark,
-          lineHeight = 18.sp
-        ),
-        maxLines = 2
-      )
-
-      Spacer(modifier = Modifier.height(10.dp))
-
-      // Amenities row
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        if (property.hasBorehole) {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-              imageVector = Icons.Default.WaterDrop,
-              contentDescription = "Running Water",
-              tint = ForestAccent,
-              modifier = Modifier.size(15.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Water", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
-          }
-        }
-        if (property.hasPrepaidMeter) {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-              imageVector = Icons.Default.ElectricBolt,
-              contentDescription = "Prepaid Meter",
-              tint = WarmGoldAccent,
-              modifier = Modifier.size(15.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Prepaid Meter", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
-          }
-        }
-        if (property.isGated) {
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-              imageVector = Icons.Default.Security,
-              contentDescription = "Gated",
-              tint = ForestGreenPrimary,
-              modifier = Modifier.size(15.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Gated", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
-          }
-        }
-      }
-
-      Spacer(modifier = Modifier.height(12.dp))
-      HorizontalDivider(color = SoftCreamBorder.copy(alpha = 0.6f))
-      Spacer(modifier = Modifier.height(10.dp))
-
-      // Landlord name & Call action
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Column {
-          Text(
-            text = property.landlordName,
-            style = MaterialTheme.typography.bodyMedium.copy(
-              fontWeight = FontWeight.Bold,
-              color = TextPrimaryDark
-            )
-          )
-          Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH) property.landlordRoleEn else property.landlordRolePidgin,
-            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondaryDark)
-          )
-        }
-
-        Button(
-          onClick = onCallClick,
-          shape = RoundedCornerShape(10.dp),
-          colors = ButtonDefaults.buttonColors(
-            containerColor = ForestGreenPrimary,
-            contentColor = Color.White
-          ),
-          contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-          modifier = Modifier.testTag("call_landlord_btn_${property.id}")
+        // Category Tag
+        Surface(
+          modifier = Modifier
+            .padding(10.dp)
+            .align(Alignment.TopEnd),
+          color = SkyBluePrimary,
+          shape = RoundedCornerShape(6.dp)
         ) {
-          Icon(
-            imageVector = Icons.Default.Phone,
-            contentDescription = null,
-            modifier = Modifier.size(16.dp)
-          )
-          Spacer(modifier = Modifier.width(6.dp))
           Text(
-            text = DwelloStrings.tapToCall(currentLanguage),
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+            text = if (currentLanguage == AppLanguage.ENGLISH) property.categoryEn else property.categoryPidgin,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelSmall.copy(
+              fontSize = 11.sp,
+              color = Color.White,
+              fontWeight = FontWeight.Bold
+            )
           )
+        }
+      }
+
+      // Card Body
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(14.dp)
+      ) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          // Location Badge in soft blue
+          Surface(
+            color = SoftBlueAccent,
+            shape = RoundedCornerShape(8.dp)
+          ) {
+            Row(
+              modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(
+                imageVector = Icons.Default.LocationOn,
+                contentDescription = null,
+                tint = SkyBluePrimary,
+                modifier = Modifier.size(14.dp)
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text(
+                text = property.area,
+                style = MaterialTheme.typography.labelMedium.copy(
+                  fontWeight = FontWeight.Bold,
+                  color = DeepNavyText
+                )
+              )
+            }
+          }
+
+          // Price in Sky Blue
+          Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+              text = property.priceFormatted,
+              style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.ExtraBold,
+                color = SkyBluePrimary
+              )
+            )
+            Text(
+              text = DwelloStrings.perYear(currentLanguage),
+              style = MaterialTheme.typography.labelSmall.copy(
+                color = NavyTextSecondary
+              )
+            )
+          }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Title in Deep Navy
+        Text(
+          text = if (currentLanguage == AppLanguage.ENGLISH) property.titleEn else property.titlePidgin,
+          style = MaterialTheme.typography.titleSmall.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText,
+            fontSize = 16.sp
+          )
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+          text = if (currentLanguage == AppLanguage.ENGLISH) property.descriptionEn else property.descriptionPidgin,
+          style = MaterialTheme.typography.bodySmall.copy(
+            color = NavyTextSecondary,
+            lineHeight = 18.sp
+          ),
+          maxLines = 2
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Amenities row
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          if (property.hasBorehole) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Icon(
+                imageVector = Icons.Default.WaterDrop,
+                contentDescription = "Running Water",
+                tint = SkyBluePrimary,
+                modifier = Modifier.size(15.dp)
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text("Water", style = MaterialTheme.typography.labelSmall, color = NavyTextSecondary)
+            }
+          }
+          if (property.hasPrepaidMeter) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Icon(
+                imageVector = Icons.Default.ElectricBolt,
+                contentDescription = "Prepaid Meter",
+                tint = WarmAmberAccent,
+                modifier = Modifier.size(15.dp)
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text("Prepaid Meter", style = MaterialTheme.typography.labelSmall, color = NavyTextSecondary)
+            }
+          }
+          if (property.isGated) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Icon(
+                imageVector = Icons.Default.Security,
+                contentDescription = "Gated",
+                tint = SkyBlueDark,
+                modifier = Modifier.size(15.dp)
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text("Gated", style = MaterialTheme.typography.labelSmall, color = NavyTextSecondary)
+            }
+          }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        HorizontalDivider(color = SoftBlueBorder.copy(alpha = 0.5f))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Landlord name & Call action
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Column {
+            Text(
+              text = property.landlordName,
+              style = MaterialTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = DeepNavyText
+              )
+            )
+            Text(
+              text = if (currentLanguage == AppLanguage.ENGLISH) property.landlordRoleEn else property.landlordRolePidgin,
+              style = MaterialTheme.typography.labelSmall.copy(color = NavyTextSecondary)
+            )
+          }
+
+          Button(
+            onClick = onCallClick,
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(
+              containerColor = SkyBluePrimary,
+              contentColor = Color.White
+            ),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+            modifier = Modifier.testTag("call_landlord_btn_${property.id}")
+          ) {
+            Icon(
+              imageVector = Icons.Default.Phone,
+              contentDescription = null,
+              modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+              text = DwelloStrings.tapToCall(currentLanguage),
+              style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+            )
+          }
         }
       }
     }
@@ -870,53 +944,102 @@ fun PropertyDetailDialog(
       Text(
         text = if (currentLanguage == AppLanguage.ENGLISH) property.titleEn else property.titlePidgin,
         fontWeight = FontWeight.Bold,
-        color = ForestGreenDark,
+        color = DeepNavyText,
         fontSize = 18.sp
       )
     },
     text = {
-      Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-          text = "${property.priceFormatted} ${DwelloStrings.perYear(currentLanguage)}",
-          style = MaterialTheme.typography.titleMedium.copy(
-            color = ForestGreenPrimary,
-            fontWeight = FontWeight.ExtraBold
-          )
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-          text = "📍 ${property.neighborhoodNote}, ${property.area}, Benin City",
-          style = MaterialTheme.typography.bodyMedium.copy(
-            color = TextSecondaryDark,
-            fontWeight = FontWeight.Medium
-          )
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) property.descriptionEn else property.descriptionPidgin,
-          style = MaterialTheme.typography.bodyMedium.copy(
-            color = TextPrimaryDark,
-            lineHeight = 20.sp
-          )
-        )
-        Spacer(modifier = Modifier.height(14.dp))
-        Surface(
-          color = LightSagePill,
-          shape = RoundedCornerShape(10.dp),
-          modifier = Modifier.fillMaxWidth()
-        ) {
-          Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-              text = "Contact: ${property.landlordName} (${if (currentLanguage == AppLanguage.ENGLISH) property.landlordRoleEn else property.landlordRolePidgin})",
-              style = MaterialTheme.typography.bodyMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = ForestGreenDark
+      LazyColumn(modifier = Modifier.fillMaxWidth()) {
+        item {
+          // Property Hero Photograph
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(160.dp)
+              .clip(RoundedCornerShape(10.dp))
+          ) {
+            Image(
+              painter = painterResource(id = property.imageResId),
+              contentDescription = property.titleEn,
+              modifier = Modifier.fillMaxSize(),
+              contentScale = ContentScale.Crop
+            )
+          }
+
+          Spacer(modifier = Modifier.height(10.dp))
+
+          // Demonstration Data Notice
+          Surface(
+            color = Color(0xFFF1F5F9),
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Row(
+              modifier = Modifier.padding(8.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null,
+                tint = NavyTextSecondary,
+                modifier = Modifier.size(14.dp)
               )
+              Spacer(modifier = Modifier.width(6.dp))
+              Text(
+                text = if (currentLanguage == AppLanguage.ENGLISH)
+                  "Sample demonstration listing - DWELLO HOMES Benin City"
+                else
+                  "Sample demo listing - DWELLO HOMES Benin City",
+                style = MaterialTheme.typography.labelSmall.copy(color = NavyTextSecondary, fontSize = 11.sp)
+              )
+            }
+          }
+
+          Spacer(modifier = Modifier.height(10.dp))
+
+          Text(
+            text = "${property.priceFormatted} ${DwelloStrings.perYear(currentLanguage)}",
+            style = MaterialTheme.typography.titleMedium.copy(
+              color = SkyBluePrimary,
+              fontWeight = FontWeight.ExtraBold
             )
-            Text(
-              text = "Phone: ${property.phoneContact}",
-              style = MaterialTheme.typography.bodySmall.copy(color = TextSecondaryDark)
+          )
+          Spacer(modifier = Modifier.height(4.dp))
+          Text(
+            text = "📍 ${property.neighborhoodNote}, ${property.area}, Benin City",
+            style = MaterialTheme.typography.bodyMedium.copy(
+              color = NavyTextSecondary,
+              fontWeight = FontWeight.Medium
             )
+          )
+          Spacer(modifier = Modifier.height(10.dp))
+          Text(
+            text = if (currentLanguage == AppLanguage.ENGLISH) property.descriptionEn else property.descriptionPidgin,
+            style = MaterialTheme.typography.bodyMedium.copy(
+              color = DeepNavyText,
+              lineHeight = 20.sp
+            )
+          )
+          Spacer(modifier = Modifier.height(12.dp))
+          Surface(
+            color = VeryLightBlueBackground,
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+            border = BorderStroke(1.dp, SoftBlueBorder)
+          ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+              Text(
+                text = "Contact: ${property.landlordName} (${if (currentLanguage == AppLanguage.ENGLISH) property.landlordRoleEn else property.landlordRolePidgin})",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                  fontWeight = FontWeight.Bold,
+                  color = DeepNavyText
+                )
+              )
+              Text(
+                text = "Phone: ${property.phoneContact}",
+                style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+              )
+            }
           }
         }
       }
@@ -924,7 +1047,7 @@ fun PropertyDetailDialog(
     confirmButton = {
       Button(
         onClick = onCall,
-        colors = ButtonDefaults.buttonColors(containerColor = ForestGreenPrimary)
+        colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
       ) {
         Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
         Spacer(modifier = Modifier.width(6.dp))
@@ -933,7 +1056,7 @@ fun PropertyDetailDialog(
     },
     dismissButton = {
       TextButton(onClick = onDismiss) {
-        Text("Close", color = TextSecondaryDark)
+        Text("Close", color = NavyTextSecondary)
       }
     }
   )

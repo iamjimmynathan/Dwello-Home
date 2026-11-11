@@ -19,19 +19,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,14 +52,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AppLanguage
 import com.example.ui.components.DwelloHeader
-import com.example.ui.theme.ForestGreenDark
-import com.example.ui.theme.ForestGreenPrimary
-import com.example.ui.theme.LightSagePill
-import com.example.ui.theme.SoftCreamBackground
-import com.example.ui.theme.SoftCreamBorder
-import com.example.ui.theme.TextPrimaryDark
-import com.example.ui.theme.TextSecondaryDark
-import com.example.ui.theme.WarmGoldAccent
+import com.example.ui.theme.CardBorderSubtle
+import com.example.ui.theme.DeepNavyText
+import com.example.ui.theme.MainBackgroundWhite
+import com.example.ui.theme.NavyTextSecondary
+import com.example.ui.theme.SkyBluePrimary
+import com.example.ui.theme.SoftBlueAccent
+import com.example.ui.theme.SoftBlueBorder
+import com.example.ui.theme.VeryLightBlueBackground
 
 data class ChatItem(
   val id: String,
@@ -94,6 +90,12 @@ fun MessagesScreen(
       "Yes! We have steady borehole water and personal prepaid meter. No NEPA arguments."
     )
   }
+
+  val quickQuestions = listOf(
+    if (currentLanguage == AppLanguage.ENGLISH) "Is this house still available?" else "House still dey available?",
+    if (currentLanguage == AppLanguage.ENGLISH) "When can I come for inspection?" else "When I fit come check the house?",
+    if (currentLanguage == AppLanguage.ENGLISH) "Is caution fee included?" else "Caution fee dey inside?"
+  )
 
   val mockChats = listOf(
     ChatItem(
@@ -131,7 +133,7 @@ fun MessagesScreen(
   Column(
     modifier = modifier
       .fillMaxSize()
-      .background(SoftCreamBackground)
+      .background(MainBackgroundWhite)
   ) {
     // Header
     DwelloHeader(
@@ -152,7 +154,7 @@ fun MessagesScreen(
             text = if (currentLanguage == AppLanguage.ENGLISH) "Landlord & Agent Inquiries" else "Messages with Landlord & Agents",
             style = MaterialTheme.typography.titleLarge.copy(
               fontWeight = FontWeight.ExtraBold,
-              color = ForestGreenDark
+              color = DeepNavyText
             )
           )
           Text(
@@ -160,7 +162,7 @@ fun MessagesScreen(
               "Chat directly about inspection times and house availability"
             else
               "Chat direct to agree time for inspection and house availability",
-            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondaryDark)
+            style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
           )
           Spacer(modifier = Modifier.height(14.dp))
         }
@@ -174,7 +176,7 @@ fun MessagesScreen(
               .testTag("chat_item_${chat.id}"),
             shape = RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            border = BorderStroke(1.dp, SoftCreamBorder),
+            border = BorderStroke(1.dp, CardBorderSubtle),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
           ) {
             Row(
@@ -187,7 +189,7 @@ fun MessagesScreen(
                 modifier = Modifier
                   .size(46.dp)
                   .clip(CircleShape)
-                  .background(ForestGreenPrimary),
+                  .background(SkyBluePrimary),
                 contentAlignment = Alignment.Center
               ) {
                 Text(
@@ -210,18 +212,18 @@ fun MessagesScreen(
                     text = chat.senderName,
                     style = MaterialTheme.typography.titleSmall.copy(
                       fontWeight = FontWeight.Bold,
-                      color = TextPrimaryDark
+                      color = DeepNavyText
                     )
                   )
                   Text(
                     text = chat.time,
-                    style = MaterialTheme.typography.labelSmall.copy(color = TextSecondaryDark)
+                    style = MaterialTheme.typography.labelSmall.copy(color = NavyTextSecondary)
                   )
                 }
                 Text(
                   text = chat.propertyTitle,
                   style = MaterialTheme.typography.labelSmall.copy(
-                    color = ForestGreenPrimary,
+                    color = SkyBluePrimary,
                     fontWeight = FontWeight.SemiBold
                   )
                 )
@@ -229,7 +231,7 @@ fun MessagesScreen(
                 Text(
                   text = chat.lastMessage,
                   style = MaterialTheme.typography.bodySmall.copy(
-                    color = TextSecondaryDark
+                    color = NavyTextSecondary
                   ),
                   maxLines = 1
                 )
@@ -264,18 +266,18 @@ fun MessagesScreen(
                 text = "← Back",
                 style = MaterialTheme.typography.labelLarge.copy(
                   fontWeight = FontWeight.Bold,
-                  color = ForestGreenPrimary
+                  color = SkyBluePrimary
                 )
               )
               Spacer(modifier = Modifier.width(10.dp))
               Column {
                 Text(
                   text = chat.senderName,
-                  style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = TextPrimaryDark)
+                  style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = DeepNavyText)
                 )
                 Text(
                   text = chat.role,
-                  style = MaterialTheme.typography.labelSmall.copy(color = TextSecondaryDark)
+                  style = MaterialTheme.typography.labelSmall.copy(color = NavyTextSecondary)
                 )
               }
             }
@@ -286,7 +288,7 @@ fun MessagesScreen(
                 context.startActivity(intent)
               }
             ) {
-              Icon(imageVector = Icons.Default.Call, contentDescription = "Call", tint = ForestGreenPrimary)
+              Icon(imageVector = Icons.Default.Call, contentDescription = "Call", tint = SkyBluePrimary)
             }
           }
         }
@@ -300,7 +302,7 @@ fun MessagesScreen(
         ) {
           item {
             Surface(
-              color = LightSagePill,
+              color = SoftBlueAccent,
               shape = RoundedCornerShape(8.dp),
               modifier = Modifier
                 .fillMaxWidth()
@@ -311,7 +313,7 @@ fun MessagesScreen(
                 modifier = Modifier.padding(8.dp),
                 style = MaterialTheme.typography.labelMedium.copy(
                   fontWeight = FontWeight.Bold,
-                  color = ForestGreenDark
+                  color = DeepNavyText
                 )
               )
             }
@@ -324,19 +326,48 @@ fun MessagesScreen(
               horizontalArrangement = if (isFromMe) Arrangement.End else Arrangement.Start
             ) {
               Surface(
-                color = if (isFromMe) ForestGreenPrimary else Color.White,
+                color = if (isFromMe) SkyBluePrimary else VeryLightBlueBackground,
                 shape = RoundedCornerShape(12.dp),
-                border = if (isFromMe) null else BorderStroke(1.dp, SoftCreamBorder),
+                border = if (isFromMe) null else BorderStroke(1.dp, SoftBlueBorder),
                 modifier = Modifier.widthIn(max = 280.dp)
               ) {
                 Text(
                   text = msg,
                   modifier = Modifier.padding(12.dp),
                   style = MaterialTheme.typography.bodyMedium.copy(
-                    color = if (isFromMe) Color.White else TextPrimaryDark
+                    color = if (isFromMe) Color.White else DeepNavyText
                   )
                 )
               }
+            }
+          }
+        }
+
+        // Quick suggested inquiry pills
+        LazyRow(
+          modifier = Modifier
+            .fillMaxWidth()
+            .background(VeryLightBlueBackground)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          items(quickQuestions) { q ->
+            Surface(
+              color = Color.White,
+              shape = RoundedCornerShape(16.dp),
+              border = BorderStroke(1.dp, SoftBlueBorder),
+              modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .clickable { chatMessages.add(q) }
+            ) {
+              Text(
+                text = q,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                style = MaterialTheme.typography.labelSmall.copy(
+                  color = SkyBluePrimary,
+                  fontWeight = FontWeight.SemiBold
+                )
+              )
             }
           }
         }
@@ -356,15 +387,19 @@ fun MessagesScreen(
             OutlinedTextField(
               value = messageInput,
               onValueChange = { messageInput = it },
-              placeholder = { Text(if (currentLanguage == AppLanguage.ENGLISH) "Type message..." else "Type message...") },
+              placeholder = { Text("Type message...") },
               modifier = Modifier
                 .weight(1f)
                 .testTag("chat_input_field"),
               singleLine = true,
               shape = RoundedCornerShape(20.dp),
               colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = ForestGreenPrimary,
-                unfocusedBorderColor = SoftCreamBorder
+                focusedContainerColor = VeryLightBlueBackground,
+                unfocusedContainerColor = VeryLightBlueBackground,
+                focusedBorderColor = SkyBluePrimary,
+                unfocusedBorderColor = SoftBlueBorder,
+                focusedTextColor = DeepNavyText,
+                unfocusedTextColor = DeepNavyText
               )
             )
 
@@ -380,7 +415,7 @@ fun MessagesScreen(
               modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(ForestGreenPrimary)
+                .background(SkyBluePrimary)
                 .testTag("send_chat_message_btn")
             ) {
               Icon(imageVector = Icons.Default.Send, contentDescription = "Send", tint = Color.White)

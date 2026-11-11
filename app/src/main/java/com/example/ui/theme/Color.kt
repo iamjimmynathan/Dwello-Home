@@ -2,25 +2,30 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// DWELLO HOMES Palette: Dark Forest Green, White, Soft Cream
-val ForestGreenPrimary = Color(0xFF143D28)
-val ForestGreenDark = Color(0xFF0C2418)
-val ForestGreenLight = Color(0xFF26533A)
-val ForestGreenContainer = Color(0xFFD6E8DC)
-val OnForestGreenContainer = Color(0xFF072113)
+// DWELLO HOMES Redesigned Palette: Sky Blue & Clean Modern Navy
+// Primary colour: Sky blue (#168BE8)
+val SkyBluePrimary = Color(0xFF168BE8)
+val SkyBlueDark = Color(0xFF0F6BB7)
+val SkyBlueLight = Color(0xFF42A5F5)
 
-val SoftCreamBackground = Color(0xFFFAF8F2)
-val SoftCreamSurface = Color(0xFFF5F1E8)
-val SoftCreamCard = Color(0xFFFFFFFF)
-val SoftCreamBorder = Color(0xFFE2DDD1)
+// Light background: Very light blue (#EAF5FF)
+val VeryLightBlueBackground = Color(0xFFEAF5FF)
 
-val ForestAccent = Color(0xFF2D6A4F)
-val WarmGoldAccent = Color(0xFFC78B38)
-val LightSagePill = Color(0xFFE5EDE7)
+// Main background: White (#FFFFFF)
+val MainBackgroundWhite = Color(0xFFFFFFFF)
 
-val TextPrimaryDark = Color(0xFF132219)
-val TextSecondaryDark = Color(0xFF4A5D52)
-val TextLight = Color(0xFFFFFFFF)
+// Text: Deep navy (#263746)
+val DeepNavyText = Color(0xFF263746)
+val NavyTextSecondary = Color(0xFF5A6D80)
+val NavyTextMuted = Color(0xFF8699A8)
 
-val ErrorRed = Color(0xFFBA1A1A)
-val SuccessGreen = Color(0xFF1E7B44)
+// Secondary accents: Soft blue (#D5EAFE)
+val SoftBlueAccent = Color(0xFFD5EAFE)
+val SoftBlueBorder = Color(0xFFC7E2FD)
+
+val CardSurfaceWhite = Color(0xFFFFFFFF)
+val CardBorderSubtle = Color(0xFFE5EFF8)
+
+val WarmAmberAccent = Color(0xFFF59E0B)
+val ErrorRed = Color(0xFFDC2626)
+val SuccessGreen = Color(0xFF16A34A)

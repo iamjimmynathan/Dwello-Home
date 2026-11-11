@@ -1,7 +1,9 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,11 +22,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.AddHome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,6 +39,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -41,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,23 +55,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.AppLanguage
 import com.example.data.DwelloStrings
+import com.example.data.PropertyItem
 import com.example.data.SamplePropertyData
 import com.example.ui.components.DwelloHeader
-import com.example.ui.theme.ForestGreenDark
-import com.example.ui.theme.ForestGreenPrimary
-import com.example.ui.theme.LightSagePill
-import com.example.ui.theme.SoftCreamBackground
-import com.example.ui.theme.SoftCreamBorder
-import com.example.ui.theme.TextPrimaryDark
-import com.example.ui.theme.TextSecondaryDark
-import com.example.ui.theme.WarmGoldAccent
+import com.example.ui.theme.CardBorderSubtle
+import com.example.ui.theme.DeepNavyText
+import com.example.ui.theme.MainBackgroundWhite
+import com.example.ui.theme.NavyTextSecondary
+import com.example.ui.theme.SkyBlueDark
+import com.example.ui.theme.SkyBluePrimary
+import com.example.ui.theme.SoftBlueAccent
+import com.example.ui.theme.SoftBlueBorder
+import com.example.ui.theme.VeryLightBlueBackground
 
 @Composable
 fun PostHouseScreen(
@@ -76,21 +88,52 @@ fun PostHouseScreen(
   var houseType by remember { mutableStateOf("Self-Con") }
   var selectedArea by remember { mutableStateOf("Uselu / Ugbowo") }
   var streetAddress by remember { mutableStateOf("") }
-  var rentPrice by remember { mutableStateOf("") }
+  var rentPrice by remember { mutableStateOf("250000") }
   var landlordName by remember { mutableStateOf("") }
   var phoneNumber by remember { mutableStateOf("") }
   var hasWater by remember { mutableStateOf(true) }
   var hasPrepaidMeter by remember { mutableStateOf(true) }
   var isGated by remember { mutableStateOf(true) }
+  var selectedPhotoRes by remember { mutableIntStateOf(R.drawable.img_benin_house_exterior) }
 
+  var showPreviewDialog by remember { mutableStateOf(false) }
   var showSuccessDialog by remember { mutableStateOf(false) }
+  var postedRefNumber by remember { mutableStateOf("") }
 
   val houseTypes = listOf("Self-Con", "2-Bedroom Flat", "3-Bedroom Flat", "Single Room", "Commercial Shop")
+
+  val previewProperty = remember(houseType, selectedArea, streetAddress, rentPrice, landlordName, phoneNumber, hasWater, hasPrepaidMeter, isGated, selectedPhotoRes) {
+    val cleanPrice = rentPrice.filter { it.isDigit() }.toLongOrNull() ?: 250000L
+    PropertyItem(
+      id = "user_prop_${System.currentTimeMillis()}",
+      titleEn = "$houseType Apartment",
+      titlePidgin = "$houseType House",
+      categoryEn = houseType,
+      categoryPidgin = houseType,
+      area = selectedArea,
+      priceNaira = cleanPrice,
+      priceFormatted = "₦${String.format("%,d", cleanPrice)}",
+      bedrooms = if (houseType.contains("2")) 2 else if (houseType.contains("3")) 3 else 1,
+      bathrooms = 1,
+      isGated = isGated,
+      hasBorehole = hasWater,
+      hasPrepaidMeter = hasPrepaidMeter,
+      landlordName = landlordName.ifBlank { "Property Owner" },
+      landlordRoleEn = "Landlord / Caretaker",
+      landlordRolePidgin = "House Owner",
+      phoneContact = phoneNumber.ifBlank { "0803 000 0000" },
+      descriptionEn = "Quality $houseType in $selectedArea, Benin City. ${if (streetAddress.isNotBlank()) "Location: $streetAddress. " else ""}Features borehole running water, prepaid meter, and secure compound.",
+      descriptionPidgin = "Clean $houseType for $selectedArea, Benin City. ${if (streetAddress.isNotBlank()) "Address: $streetAddress. " else ""}Water and prepaid light dey.",
+      neighborhoodNote = streetAddress.ifBlank { "Benin City Residential Axis" },
+      imageResId = selectedPhotoRes,
+      isDemonstrationData = false
+    )
+  }
 
   Column(
     modifier = modifier
       .fillMaxSize()
-      .background(SoftCreamBackground)
+      .background(MainBackgroundWhite)
   ) {
     // Header
     DwelloHeader(
@@ -109,7 +152,8 @@ fun PostHouseScreen(
         Card(
           modifier = Modifier.fillMaxWidth(),
           shape = RoundedCornerShape(14.dp),
-          colors = CardDefaults.cardColors(containerColor = ForestGreenDark)
+          colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
+          border = BorderStroke(1.dp, SoftBlueBorder)
         ) {
           Row(
             modifier = Modifier.padding(16.dp),
@@ -119,13 +163,13 @@ fun PostHouseScreen(
               modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(WarmGoldAccent),
+                .background(SkyBluePrimary),
               contentAlignment = Alignment.Center
             ) {
               Icon(
                 imageVector = Icons.Default.AddHome,
                 contentDescription = null,
-                tint = ForestGreenDark,
+                tint = Color.White,
                 modifier = Modifier.size(24.dp)
               )
             }
@@ -135,13 +179,13 @@ fun PostHouseScreen(
                 text = DwelloStrings.postHouseHeader(currentLanguage),
                 style = MaterialTheme.typography.titleMedium.copy(
                   fontWeight = FontWeight.Bold,
-                  color = Color.White
+                  color = DeepNavyText
                 )
               )
               Text(
                 text = DwelloStrings.postHouseInstruction(currentLanguage),
                 style = MaterialTheme.typography.bodySmall.copy(
-                  color = Color.White.copy(alpha = 0.85f)
+                  color = NavyTextSecondary
                 )
               )
             }
@@ -157,7 +201,7 @@ fun PostHouseScreen(
           text = if (currentLanguage == AppLanguage.ENGLISH) "1. Select House Type" else "1. Choose Type of House",
           style = MaterialTheme.typography.titleSmall.copy(
             fontWeight = FontWeight.Bold,
-            color = ForestGreenDark
+            color = DeepNavyText
           )
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -176,9 +220,9 @@ fun PostHouseScreen(
                     .clip(RoundedCornerShape(12.dp))
                     .clickable { houseType = type }
                     .testTag("house_type_chip_$type"),
-                  color = if (isSelected) ForestGreenPrimary else Color.White,
+                  color = if (isSelected) SkyBluePrimary else Color.White,
                   shape = RoundedCornerShape(12.dp),
-                  border = BorderStroke(1.dp, if (isSelected) ForestGreenPrimary else SoftCreamBorder)
+                  border = BorderStroke(1.dp, if (isSelected) SkyBluePrimary else SoftBlueBorder)
                 ) {
                   Row(
                     modifier = Modifier.padding(vertical = 12.dp, horizontal = 10.dp),
@@ -198,7 +242,7 @@ fun PostHouseScreen(
                       text = type,
                       style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.White else TextPrimaryDark
+                        color = if (isSelected) Color.White else DeepNavyText
                       )
                     )
                   }
@@ -214,13 +258,94 @@ fun PostHouseScreen(
         Spacer(modifier = Modifier.height(18.dp))
       }
 
-      // Step 2: Location in Benin City
+      // Step 2: Property Photographs
       item {
         Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "2. Area in Benin City" else "2. Area wey the house dey for Benin",
+          text = if (currentLanguage == AppLanguage.ENGLISH) "2. Property Photograph" else "2. House Picture",
           style = MaterialTheme.typography.titleSmall.copy(
             fontWeight = FontWeight.Bold,
-            color = ForestGreenDark
+            color = DeepNavyText
+          )
+        )
+        Text(
+          text = if (currentLanguage == AppLanguage.ENGLISH) "Select property photo representation:" else "Choose picture for the house:",
+          style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+          // Photo Option 1: Exterior
+          val isExt = selectedPhotoRes == R.drawable.img_benin_house_exterior
+          Card(
+            modifier = Modifier
+              .weight(1f)
+              .clip(RoundedCornerShape(12.dp))
+              .clickable { selectedPhotoRes = R.drawable.img_benin_house_exterior },
+            border = BorderStroke(2.dp, if (isExt) SkyBluePrimary else SoftBlueBorder)
+          ) {
+            Column {
+              Image(
+                painter = painterResource(id = R.drawable.img_benin_house_exterior),
+                contentDescription = "Compound Exterior",
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .height(85.dp),
+                contentScale = ContentScale.Crop
+              )
+              Text(
+                text = "Compound Exterior",
+                modifier = Modifier.padding(6.dp),
+                style = MaterialTheme.typography.labelSmall.copy(
+                  fontWeight = if (isExt) FontWeight.Bold else FontWeight.Normal,
+                  color = if (isExt) SkyBluePrimary else DeepNavyText
+                )
+              )
+            }
+          }
+
+          // Photo Option 2: Interior
+          val isInt = selectedPhotoRes == R.drawable.img_benin_house_interior
+          Card(
+            modifier = Modifier
+              .weight(1f)
+              .clip(RoundedCornerShape(12.dp))
+              .clickable { selectedPhotoRes = R.drawable.img_benin_house_interior },
+            border = BorderStroke(2.dp, if (isInt) SkyBluePrimary else SoftBlueBorder)
+          ) {
+            Column {
+              Image(
+                painter = painterResource(id = R.drawable.img_benin_house_interior),
+                contentDescription = "Apartment Interior",
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .height(85.dp),
+                contentScale = ContentScale.Crop
+              )
+              Text(
+                text = "Living Room Interior",
+                modifier = Modifier.padding(6.dp),
+                style = MaterialTheme.typography.labelSmall.copy(
+                  fontWeight = if (isInt) FontWeight.Bold else FontWeight.Normal,
+                  color = if (isInt) SkyBluePrimary else DeepNavyText
+                )
+              )
+            }
+          }
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+      }
+
+      // Step 3: Location in Benin City
+      item {
+        Text(
+          text = if (currentLanguage == AppLanguage.ENGLISH) "3. Location in Benin City" else "3. Area wey the house dey for Benin",
+          style = MaterialTheme.typography.titleSmall.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
           )
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -239,9 +364,9 @@ fun PostHouseScreen(
                     .weight(1f)
                     .clip(RoundedCornerShape(10.dp))
                     .clickable { selectedArea = area.name },
-                  color = if (isSelected) LightSagePill else Color.White,
+                  color = if (isSelected) SoftBlueAccent else Color.White,
                   shape = RoundedCornerShape(10.dp),
-                  border = BorderStroke(1.dp, if (isSelected) ForestGreenPrimary else SoftCreamBorder)
+                  border = BorderStroke(1.dp, if (isSelected) SkyBluePrimary else SoftBlueBorder)
                 ) {
                   Row(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
@@ -250,7 +375,7 @@ fun PostHouseScreen(
                     Icon(
                       imageVector = Icons.Default.LocationOn,
                       contentDescription = null,
-                      tint = if (isSelected) ForestGreenPrimary else TextSecondaryDark,
+                      tint = if (isSelected) SkyBluePrimary else NavyTextSecondary,
                       modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
@@ -258,7 +383,7 @@ fun PostHouseScreen(
                       text = area.name,
                       style = MaterialTheme.typography.bodySmall.copy(
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) ForestGreenDark else TextPrimaryDark
+                        color = DeepNavyText
                       )
                     )
                   }
@@ -268,7 +393,7 @@ fun PostHouseScreen(
           }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         OutlinedTextField(
           value = streetAddress,
@@ -280,23 +405,25 @@ fun PostHouseScreen(
           singleLine = true,
           shape = RoundedCornerShape(12.dp),
           colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
-            focusedBorderColor = ForestGreenPrimary,
-            unfocusedBorderColor = SoftCreamBorder
+            focusedContainerColor = VeryLightBlueBackground,
+            unfocusedContainerColor = VeryLightBlueBackground,
+            focusedBorderColor = SkyBluePrimary,
+            unfocusedBorderColor = SoftBlueBorder,
+            focusedTextColor = DeepNavyText,
+            unfocusedTextColor = DeepNavyText
           )
         )
 
         Spacer(modifier = Modifier.height(18.dp))
       }
 
-      // Step 3: Rent Price
+      // Step 4: Rent Price
       item {
         Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "3. Yearly Rent (₦)" else "3. House Rent per year (₦)",
+          text = if (currentLanguage == AppLanguage.ENGLISH) "4. Yearly Rent (₦)" else "4. House Rent per year (₦)",
           style = MaterialTheme.typography.titleSmall.copy(
             fontWeight = FontWeight.Bold,
-            color = ForestGreenDark
+            color = DeepNavyText
           )
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -304,32 +431,34 @@ fun PostHouseScreen(
         OutlinedTextField(
           value = rentPrice,
           onValueChange = { rentPrice = it },
-          label = { Text(if (currentLanguage == AppLanguage.ENGLISH) "e.g. 250000" else "e.g. 250000") },
+          label = { Text("e.g. 250000") },
           modifier = Modifier
             .fillMaxWidth()
             .testTag("rent_price_input"),
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
           singleLine = true,
-          prefix = { Text("₦ ", fontWeight = FontWeight.Bold, color = ForestGreenPrimary) },
+          prefix = { Text("₦ ", fontWeight = FontWeight.Bold, color = SkyBluePrimary) },
           shape = RoundedCornerShape(12.dp),
           colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
-            focusedBorderColor = ForestGreenPrimary,
-            unfocusedBorderColor = SoftCreamBorder
+            focusedContainerColor = VeryLightBlueBackground,
+            unfocusedContainerColor = VeryLightBlueBackground,
+            focusedBorderColor = SkyBluePrimary,
+            unfocusedBorderColor = SoftBlueBorder,
+            focusedTextColor = DeepNavyText,
+            unfocusedTextColor = DeepNavyText
           )
         )
 
         Spacer(modifier = Modifier.height(18.dp))
       }
 
-      // Step 4: Amenities
+      // Step 5: Amenities
       item {
         Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "4. Amenities in Compound" else "4. Things wey dey the compound",
+          text = if (currentLanguage == AppLanguage.ENGLISH) "5. Amenities in Compound" else "5. Things wey dey the compound",
           style = MaterialTheme.typography.titleSmall.copy(
             fontWeight = FontWeight.Bold,
-            color = ForestGreenDark
+            color = DeepNavyText
           )
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -337,7 +466,8 @@ fun PostHouseScreen(
         Column(
           modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White, RoundedCornerShape(12.dp))
+            .background(VeryLightBlueBackground, RoundedCornerShape(12.dp))
+            .border(1.dp, SoftBlueBorder, RoundedCornerShape(12.dp))
             .padding(8.dp)
         ) {
           Row(
@@ -350,12 +480,12 @@ fun PostHouseScreen(
             Checkbox(
               checked = hasWater,
               onCheckedChange = { hasWater = it },
-              colors = CheckboxDefaults.colors(checkedColor = ForestGreenPrimary)
+              colors = CheckboxDefaults.colors(checkedColor = SkyBluePrimary)
             )
             Text(
               text = if (currentLanguage == AppLanguage.ENGLISH) "Running Water (Borehole)" else "Borehole Water / Running Tap",
               style = MaterialTheme.typography.bodyMedium,
-              color = TextPrimaryDark
+              color = DeepNavyText
             )
           }
 
@@ -369,12 +499,12 @@ fun PostHouseScreen(
             Checkbox(
               checked = hasPrepaidMeter,
               onCheckedChange = { hasPrepaidMeter = it },
-              colors = CheckboxDefaults.colors(checkedColor = ForestGreenPrimary)
+              colors = CheckboxDefaults.colors(checkedColor = SkyBluePrimary)
             )
             Text(
               text = if (currentLanguage == AppLanguage.ENGLISH) "Prepaid Meter (Light)" else "Prepaid Meter (Nepa Light)",
               style = MaterialTheme.typography.bodyMedium,
-              color = TextPrimaryDark
+              color = DeepNavyText
             )
           }
 
@@ -388,12 +518,12 @@ fun PostHouseScreen(
             Checkbox(
               checked = isGated,
               onCheckedChange = { isGated = it },
-              colors = CheckboxDefaults.colors(checkedColor = ForestGreenPrimary)
+              colors = CheckboxDefaults.colors(checkedColor = SkyBluePrimary)
             )
             Text(
               text = if (currentLanguage == AppLanguage.ENGLISH) "Fenced & Gated Compound" else "Fenced Compound with Gate",
               style = MaterialTheme.typography.bodyMedium,
-              color = TextPrimaryDark
+              color = DeepNavyText
             )
           }
         }
@@ -401,13 +531,13 @@ fun PostHouseScreen(
         Spacer(modifier = Modifier.height(18.dp))
       }
 
-      // Step 5: Contact
+      // Step 6: Contact Information
       item {
         Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "5. Landlord / Caretaker Phone" else "5. Phone number to receive calls",
+          text = if (currentLanguage == AppLanguage.ENGLISH) "6. Landlord / Agent Phone" else "6. Phone number to receive calls",
           style = MaterialTheme.typography.titleSmall.copy(
             fontWeight = FontWeight.Bold,
-            color = ForestGreenDark
+            color = DeepNavyText
           )
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -415,17 +545,19 @@ fun PostHouseScreen(
         OutlinedTextField(
           value = landlordName,
           onValueChange = { landlordName = it },
-          label = { Text(if (currentLanguage == AppLanguage.ENGLISH) "Your Name" else "Your Name") },
+          label = { Text("Your Name") },
           modifier = Modifier
             .fillMaxWidth()
             .testTag("landlord_name_input"),
           singleLine = true,
           shape = RoundedCornerShape(12.dp),
           colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
-            focusedBorderColor = ForestGreenPrimary,
-            unfocusedBorderColor = SoftCreamBorder
+            focusedContainerColor = VeryLightBlueBackground,
+            unfocusedContainerColor = VeryLightBlueBackground,
+            focusedBorderColor = SkyBluePrimary,
+            unfocusedBorderColor = SoftBlueBorder,
+            focusedTextColor = DeepNavyText,
+            unfocusedTextColor = DeepNavyText
           )
         )
 
@@ -434,52 +566,152 @@ fun PostHouseScreen(
         OutlinedTextField(
           value = phoneNumber,
           onValueChange = { phoneNumber = it },
-          label = { Text(if (currentLanguage == AppLanguage.ENGLISH) "Phone Number (e.g. 080...)" else "Phone Number (e.g. 080...)") },
+          label = { Text("Phone Number (e.g. 080...)") },
           modifier = Modifier
             .fillMaxWidth()
             .testTag("phone_number_input"),
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
           leadingIcon = {
-            Icon(imageVector = Icons.Default.Phone, contentDescription = null, tint = ForestGreenPrimary)
+            Icon(imageVector = Icons.Default.Phone, contentDescription = null, tint = SkyBluePrimary)
           },
           singleLine = true,
           shape = RoundedCornerShape(12.dp),
           colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
-            focusedBorderColor = ForestGreenPrimary,
-            unfocusedBorderColor = SoftCreamBorder
+            focusedContainerColor = VeryLightBlueBackground,
+            unfocusedContainerColor = VeryLightBlueBackground,
+            focusedBorderColor = SkyBluePrimary,
+            unfocusedBorderColor = SoftBlueBorder,
+            focusedTextColor = DeepNavyText,
+            unfocusedTextColor = DeepNavyText
           )
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Large Submit Button
-        Button(
-          onClick = { showSuccessDialog = true },
-          modifier = Modifier
-            .fillMaxWidth()
-            .height(58.dp)
-            .testTag("submit_post_house_button"),
-          shape = RoundedCornerShape(14.dp),
-          colors = ButtonDefaults.buttonColors(
-            containerColor = ForestGreenPrimary,
-            contentColor = Color.White
-          ),
-          elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
+        // Action Buttons: PREVIEW PROPERTY BEFORE POSTING & SUBMIT DIRECT
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-          Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp))
-          Spacer(modifier = Modifier.width(8.dp))
-          Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH) "POST HOUSE NOW (FREE)" else "PUT HOUSE NOW (FREE)",
-            style = MaterialTheme.typography.titleMedium.copy(
-              fontWeight = FontWeight.ExtraBold,
-              letterSpacing = 0.5.sp
+          // PREVIEW BUTTON
+          OutlinedButton(
+            onClick = { showPreviewDialog = true },
+            modifier = Modifier
+              .weight(1f)
+              .height(56.dp)
+              .testTag("preview_property_button"),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(2.dp, SkyBluePrimary),
+            colors = ButtonDefaults.outlinedButtonColors(
+              containerColor = Color.White,
+              contentColor = SkyBluePrimary
             )
-          )
+          ) {
+            Icon(imageVector = Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+              text = if (currentLanguage == AppLanguage.ENGLISH) "PREVIEW" else "PREVIEW",
+              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+            )
+          }
+
+          // SUBMIT NOW BUTTON
+          Button(
+            onClick = {
+              SamplePropertyData.addProperty(previewProperty)
+              postedRefNumber = "DWL-BEN-${(1000..9999).random()}"
+              showSuccessDialog = true
+            },
+            modifier = Modifier
+              .weight(1.5f)
+              .height(56.dp)
+              .testTag("submit_post_house_button"),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(
+              containerColor = SkyBluePrimary,
+              contentColor = Color.White
+            ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
+          ) {
+            Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+              text = if (currentLanguage == AppLanguage.ENGLISH) "POST NOW (FREE)" else "PUT NOW (FREE)",
+              style = MaterialTheme.typography.titleSmall.copy(
+                fontWeight = FontWeight.ExtraBold
+              )
+            )
+          }
         }
       }
     }
+  }
+
+  // PREVIEW DIALOG
+  if (showPreviewDialog) {
+    AlertDialog(
+      onDismissRequest = { showPreviewDialog = false },
+      title = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Icon(Icons.Default.Visibility, contentDescription = null, tint = SkyBluePrimary)
+          Spacer(modifier = Modifier.width(8.dp))
+          Text(
+            text = if (currentLanguage == AppLanguage.ENGLISH) "Preview Your Listing" else "Check Wetin Tenants Go See",
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText,
+            fontSize = 18.sp
+          )
+        }
+      },
+      text = {
+        Column(modifier = Modifier.fillMaxWidth()) {
+          Surface(
+            color = VeryLightBlueBackground,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Text(
+              text = if (currentLanguage == AppLanguage.ENGLISH)
+                "This is how tenants in Benin City will see your listing card:"
+              else
+                "Na so tenants go take see your house card:",
+              modifier = Modifier.padding(8.dp),
+              style = MaterialTheme.typography.labelSmall.copy(color = DeepNavyText)
+            )
+          }
+          Spacer(modifier = Modifier.height(10.dp))
+          PropertyCard(
+            property = previewProperty,
+            currentLanguage = currentLanguage,
+            onClick = {},
+            onCallClick = {}
+          )
+        }
+      },
+      confirmButton = {
+        Button(
+          onClick = {
+            showPreviewDialog = false
+            SamplePropertyData.addProperty(previewProperty)
+            postedRefNumber = "DWL-BEN-${(1000..9999).random()}"
+            showSuccessDialog = true
+          },
+          colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
+        ) {
+          Text(if (currentLanguage == AppLanguage.ENGLISH) "Looks Good, Post Now" else "Correct, Post Am")
+        }
+      },
+      dismissButton = {
+        OutlinedButton(
+          onClick = { showPreviewDialog = false },
+          border = BorderStroke(1.dp, SkyBluePrimary)
+        ) {
+          Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = SkyBluePrimary)
+          Spacer(modifier = Modifier.width(4.dp))
+          Text("Edit Details", color = SkyBluePrimary)
+        }
+      }
+    )
   }
 
   // Success Dialog
@@ -491,14 +723,14 @@ fun PostHouseScreen(
           Icon(
             imageVector = Icons.Default.CheckCircle,
             contentDescription = null,
-            tint = ForestGreenPrimary,
+            tint = SkyBluePrimary,
             modifier = Modifier.size(28.dp)
           )
           Spacer(modifier = Modifier.width(8.dp))
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH) "House Posted Successfully!" else "House Don Enter!",
             fontWeight = FontWeight.Bold,
-            color = ForestGreenDark,
+            color = DeepNavyText,
             fontSize = 18.sp
           )
         }
@@ -507,21 +739,21 @@ fun PostHouseScreen(
         Column {
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH)
-              "Your $houseType at $selectedArea, Benin City has been submitted. Tenants looking for houses in this area will contact you directly."
+              "Your $houseType at $selectedArea, Benin City has been submitted and is now visible in the Find Houses tab. Interested tenants will contact you directly."
             else
-              "Your $houseType for $selectedArea, Benin City don enter. Tenants wey dey find house for this area go call you direct.",
-            style = MaterialTheme.typography.bodyMedium.copy(color = TextPrimaryDark, lineHeight = 20.sp)
+              "Your $houseType for $selectedArea, Benin City don enter and dey show for Find Houses now. Tenants wey dey find house go call your phone.",
+            style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText, lineHeight = 20.sp)
           )
           Spacer(modifier = Modifier.height(10.dp))
           Surface(
-            color = LightSagePill,
+            color = SoftBlueAccent,
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier.fillMaxWidth()
           ) {
             Text(
-              text = "Listing Ref: DWL-BEN-${(1000..9999).random()}",
+              text = "Listing Ref: $postedRefNumber",
               modifier = Modifier.padding(10.dp),
-              style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = ForestGreenDark)
+              style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DeepNavyText)
             )
           }
         }
@@ -532,9 +764,9 @@ fun PostHouseScreen(
             showSuccessDialog = false
             onSuccessNavigateHome()
           },
-          colors = ButtonDefaults.buttonColors(containerColor = ForestGreenPrimary)
+          colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
         ) {
-          Text("Done / Go Home")
+          Text("Done / View in Listings")
         }
       }
     )

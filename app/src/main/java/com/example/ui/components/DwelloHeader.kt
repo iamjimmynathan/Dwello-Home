@@ -14,10 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Icon
@@ -37,10 +35,9 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.AppLanguage
 import com.example.data.DwelloStrings
-import com.example.ui.theme.ForestGreenDark
-import com.example.ui.theme.ForestGreenPrimary
-import com.example.ui.theme.SoftCreamBackground
-import com.example.ui.theme.WarmGoldAccent
+import com.example.ui.theme.SkyBlueDark
+import com.example.ui.theme.SkyBluePrimary
+import com.example.ui.theme.SoftBlueAccent
 
 @Composable
 fun DwelloHeader(
@@ -52,8 +49,8 @@ fun DwelloHeader(
 ) {
   Surface(
     modifier = modifier.fillMaxWidth(),
-    color = ForestGreenPrimary,
-    shadowElevation = 4.dp
+    color = SkyBluePrimary,
+    shadowElevation = 3.dp
   ) {
     Column(
       modifier = Modifier
@@ -75,7 +72,7 @@ fun DwelloHeader(
               .size(42.dp)
               .clip(RoundedCornerShape(12.dp))
               .background(Color.White)
-              .border(1.5.dp, WarmGoldAccent, RoundedCornerShape(12.dp)),
+              .border(1.dp, SoftBlueAccent, RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
           ) {
             Image(
@@ -94,14 +91,15 @@ fun DwelloHeader(
               text = "DWELLO HOMES",
               style = MaterialTheme.typography.titleLarge.copy(
                 fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 1.sp,
+                letterSpacing = 0.5.sp,
                 color = Color.White
               )
             )
             Text(
               text = "Benin City Property Rental",
               style = MaterialTheme.typography.labelSmall.copy(
-                color = Color.White.copy(alpha = 0.82f)
+                color = Color.White.copy(alpha = 0.88f),
+                fontWeight = FontWeight.Normal
               )
             )
           }
@@ -113,9 +111,9 @@ fun DwelloHeader(
             .clip(RoundedCornerShape(20.dp))
             .clickable(onClick = onLanguageToggle)
             .testTag("language_toggle_button"),
-          color = ForestGreenDark,
+          color = SkyBlueDark,
           shape = RoundedCornerShape(20.dp),
-          border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))
+          border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
         ) {
           Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -124,7 +122,7 @@ fun DwelloHeader(
             Icon(
               imageVector = Icons.Default.Translate,
               contentDescription = "Change Language",
-              tint = WarmGoldAccent,
+              tint = Color.White,
               modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
@@ -147,7 +145,7 @@ fun DwelloHeader(
           .clip(RoundedCornerShape(8.dp))
           .clickable(enabled = onLocationClick != null) { onLocationClick?.invoke() }
           .testTag("location_indicator_bar"),
-        color = Color.White.copy(alpha = 0.12f),
+        color = Color.White.copy(alpha = 0.16f),
         shape = RoundedCornerShape(8.dp)
       ) {
         Row(
@@ -159,7 +157,7 @@ fun DwelloHeader(
           Icon(
             imageVector = Icons.Default.LocationOn,
             contentDescription = "Location",
-            tint = WarmGoldAccent,
+            tint = Color.White,
             modifier = Modifier.size(18.dp)
           )
           Spacer(modifier = Modifier.width(6.dp))
@@ -168,7 +166,7 @@ fun DwelloHeader(
               ?: DwelloStrings.initialLocation(currentLanguage),
             style = MaterialTheme.typography.bodyMedium.copy(
               color = Color.White,
-              fontWeight = FontWeight.Medium
+              fontWeight = FontWeight.SemiBold
             )
           )
         }

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -24,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,20 +44,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.AppLanguage
 import com.example.data.DwelloStrings
 import com.example.data.PropertyItem
 import com.example.data.SamplePropertyData
 import com.example.ui.components.DwelloHeader
-import com.example.ui.theme.ForestGreenDark
-import com.example.ui.theme.ForestGreenPrimary
-import com.example.ui.theme.LightSagePill
-import com.example.ui.theme.SoftCreamBackground
-import com.example.ui.theme.SoftCreamBorder
-import com.example.ui.theme.TextPrimaryDark
-import com.example.ui.theme.TextSecondaryDark
-import com.example.ui.theme.WarmGoldAccent
+import com.example.ui.theme.DeepNavyText
+import com.example.ui.theme.MainBackgroundWhite
+import com.example.ui.theme.NavyTextSecondary
+import com.example.ui.theme.SkyBluePrimary
+import com.example.ui.theme.SoftBlueBorder
+import com.example.ui.theme.VeryLightBlueBackground
 
 @Composable
 fun FindHousesScreen(
@@ -76,7 +71,7 @@ fun FindHousesScreen(
 
   val categories = listOf("All", "Self-Con", "2-Bedroom Flat", "3-Bedroom Flat", "Single Room", "Commercial Shop")
 
-  val filteredProperties = SamplePropertyData.sampleProperties.filter { item ->
+  val filteredProperties = SamplePropertyData.dynamicProperties.filter { item ->
     val matchesSearch = searchQuery.isBlank() ||
       item.area.contains(searchQuery, ignoreCase = true) ||
       item.titleEn.contains(searchQuery, ignoreCase = true) ||
@@ -90,7 +85,7 @@ fun FindHousesScreen(
   Column(
     modifier = modifier
       .fillMaxSize()
-      .background(SoftCreamBackground)
+      .background(MainBackgroundWhite)
   ) {
     // Header
     DwelloHeader(
@@ -102,7 +97,7 @@ fun FindHousesScreen(
       modifier = Modifier
         .fillMaxSize()
         .testTag("find_houses_list"),
-      contentPadding = PaddingValues(bottom = 24.dp)
+      contentPadding = PaddingValues(bottom = 28.dp)
     ) {
       // Screen Title & Search bar
       item {
@@ -115,7 +110,7 @@ fun FindHousesScreen(
             text = if (currentLanguage == AppLanguage.ENGLISH) "Find Houses in Benin City" else "Find Houses for Benin City",
             style = MaterialTheme.typography.titleLarge.copy(
               fontWeight = FontWeight.ExtraBold,
-              color = ForestGreenDark
+              color = DeepNavyText
             )
           )
           Text(
@@ -123,7 +118,7 @@ fun FindHousesScreen(
               "Direct connection to Benin landlords and verified caretakers"
             else
               "Direct contact with Benin landlords and trusted caretakers",
-            style = MaterialTheme.typography.bodySmall.copy(color = TextSecondaryDark)
+            style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
           )
 
           Spacer(modifier = Modifier.height(12.dp))
@@ -137,32 +132,32 @@ fun FindHousesScreen(
             placeholder = {
               Text(
                 text = DwelloStrings.searchPlaceholder(currentLanguage),
-                style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondaryDark.copy(alpha = 0.7f))
+                style = MaterialTheme.typography.bodyMedium.copy(color = NavyTextSecondary.copy(alpha = 0.7f))
               )
             },
             leadingIcon = {
               Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "Search",
-                tint = ForestGreenPrimary
+                tint = SkyBluePrimary
               )
             },
             trailingIcon = {
               if (searchQuery.isNotEmpty()) {
                 IconButton(onClick = { searchQuery = "" }) {
-                  Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = TextSecondaryDark)
+                  Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = NavyTextSecondary)
                 }
               }
             },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-              focusedContainerColor = Color.White,
-              unfocusedContainerColor = Color.White,
-              focusedBorderColor = ForestGreenPrimary,
-              unfocusedBorderColor = SoftCreamBorder,
-              focusedTextColor = TextPrimaryDark,
-              unfocusedTextColor = TextPrimaryDark
+              focusedContainerColor = VeryLightBlueBackground,
+              unfocusedContainerColor = VeryLightBlueBackground,
+              focusedBorderColor = SkyBluePrimary,
+              unfocusedBorderColor = SoftBlueBorder,
+              focusedTextColor = DeepNavyText,
+              unfocusedTextColor = DeepNavyText
             )
           )
         }
@@ -181,16 +176,16 @@ fun FindHousesScreen(
                 .clip(RoundedCornerShape(18.dp))
                 .clickable { selectedCategory = cat }
                 .testTag("category_filter_$cat"),
-              color = if (isSelected) ForestGreenPrimary else Color.White,
+              color = if (isSelected) SkyBluePrimary else Color.White,
               shape = RoundedCornerShape(18.dp),
-              border = BorderStroke(1.dp, if (isSelected) ForestGreenPrimary else SoftCreamBorder)
+              border = BorderStroke(1.dp, if (isSelected) SkyBluePrimary else SoftBlueBorder)
             ) {
               Text(
                 text = cat,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                 style = MaterialTheme.typography.labelMedium.copy(
                   fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                  color = if (isSelected) Color.White else TextPrimaryDark
+                  color = if (isSelected) Color.White else DeepNavyText
                 )
               )
             }
@@ -208,15 +203,15 @@ fun FindHousesScreen(
           verticalAlignment = Alignment.CenterVertically
         ) {
           Text(
-            text = "${filteredProperties.size} ${if (currentLanguage == AppLanguage.ENGLISH) "houses found" else "houses dey"}",
+            text = "${filteredProperties.size} ${if (currentLanguage == AppLanguage.ENGLISH) "houses available" else "houses dey"}",
             style = MaterialTheme.typography.labelMedium.copy(
               fontWeight = FontWeight.Bold,
-              color = ForestGreenDark
+              color = DeepNavyText
             )
           )
           Text(
             text = "Edo State • Nigeria",
-            style = MaterialTheme.typography.labelSmall.copy(color = TextSecondaryDark)
+            style = MaterialTheme.typography.labelSmall.copy(color = NavyTextSecondary)
           )
         }
       }
@@ -234,7 +229,7 @@ fun FindHousesScreen(
               Icon(
                 imageVector = Icons.Default.FilterList,
                 contentDescription = null,
-                tint = TextSecondaryDark,
+                tint = NavyTextSecondary,
                 modifier = Modifier.size(48.dp)
               )
               Spacer(modifier = Modifier.height(12.dp))
@@ -244,7 +239,7 @@ fun FindHousesScreen(
                 else
                   "House never dey for this area or type yet.",
                 style = MaterialTheme.typography.bodyMedium.copy(
-                  color = TextSecondaryDark,
+                  color = NavyTextSecondary,
                   fontWeight = FontWeight.Medium
                 )
               )
