@@ -1,7 +1,5 @@
 package com.example.ui.screens
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -40,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -64,10 +61,10 @@ fun FindHousesScreen(
   onOpenMessageWithLandlord: (PropertyItem) -> Unit,
   modifier: Modifier = Modifier
 ) {
-  val context = LocalContext.current
   var searchQuery by remember(initialSearchQuery) { mutableStateOf(initialSearchQuery ?: "") }
   var selectedCategory by remember { mutableStateOf("All") }
   var selectedPropertyForDetails by remember { mutableStateOf<PropertyItem?>(null) }
+  var enquiryProperty by remember { mutableStateOf<PropertyItem?>(null) }
 
   val categories = listOf("All", "Self-Con", "2-Bedroom Flat", "3-Bedroom Flat", "Single Room", "Commercial Shop")
 
@@ -115,9 +112,9 @@ fun FindHousesScreen(
           )
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH)
-              "Direct connection to Benin landlords and verified caretakers"
+              "Dwello Homes connects you directly with property owners and coordinates physical inspections"
             else
-              "Direct contact with Benin landlords and trusted caretakers",
+              "Dwello Homes dey connect you with house owner and arrange inspection",
             style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
           )
 
@@ -252,10 +249,7 @@ fun FindHousesScreen(
             property = property,
             currentLanguage = currentLanguage,
             onClick = { selectedPropertyForDetails = property },
-            onCallClick = {
-              val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${property.phoneContact.replace(" ", "")}"))
-              context.startActivity(intent)
-            },
+            onEnquiryClick = { enquiryProperty = property },
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
           )
         }
@@ -263,14 +257,26 @@ fun FindHousesScreen(
     }
   }
 
+  // Send Enquiry Dialog
+  enquiryProperty?.let { prop ->
+    EnquirySubmissionDialog(
+      property = prop,
+      currentLanguage = currentLanguage,
+      onDismiss = { enquiryProperty = null },
+      onSubmit = {
+        enquiryProperty = null
+      }
+    )
+  }
+
   selectedPropertyForDetails?.let { prop ->
     PropertyDetailDialog(
       property = prop,
       currentLanguage = currentLanguage,
       onDismiss = { selectedPropertyForDetails = null },
-      onCall = {
-        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${prop.phoneContact.replace(" ", "")}"))
-        context.startActivity(intent)
+      onEnquire = {
+        selectedPropertyForDetails = null
+        enquiryProperty = prop
       }
     )
   }

@@ -26,15 +26,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddHome
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -98,6 +99,7 @@ fun HomeScreen(
   var showAreaPicker by remember { mutableStateOf(false) }
   var showHelpDialog by remember { mutableStateOf(false) }
   var selectedPropertyForDetails by remember { mutableStateOf<PropertyItem?>(null) }
+  var enquiryProperty by remember { mutableStateOf<PropertyItem?>(null) }
 
   Column(
     modifier = modifier
@@ -411,22 +413,19 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(8.dp))
       }
 
-      // Property Cards with Photographs and Demonstration Disclaimer
+      // Property Cards with Photographs and Intermediary "Send Enquiry" Action
       val displayedProperties = SamplePropertyData.dynamicProperties.take(3)
       items(displayedProperties) { property ->
         PropertyCard(
           property = property,
           currentLanguage = currentLanguage,
           onClick = { selectedPropertyForDetails = property },
-          onCallClick = {
-            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${property.phoneContact.replace(" ", "")}"))
-            context.startActivity(intent)
-          },
+          onEnquiryClick = { enquiryProperty = property },
           modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
         )
       }
 
-      // 6. Contact Section in Light Blue background (#EAF5FF)
+      // 6. Contact Section: "Need help? Contact Dwello Homes."
       item {
         Spacer(modifier = Modifier.height(20.dp))
         Card(
@@ -485,7 +484,7 @@ fun HomeScreen(
               modifier = Modifier.fillMaxWidth(),
               horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-              // Direct Call Button
+              // Direct Call to Dwello Homes
               Button(
                 onClick = {
                   val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:0800393556"))
@@ -514,13 +513,13 @@ fun HomeScreen(
                 )
               }
 
-              // WhatsApp / Agent Desk
+              // WhatsApp Dwello Homes
               OutlinedButton(
                 onClick = { showHelpDialog = true },
                 modifier = Modifier
                   .weight(1f)
                   .height(48.dp)
-                  .testTag("whatsapp_agent_button"),
+                  .testTag("whatsapp_dwello_button"),
                 colors = ButtonDefaults.outlinedButtonColors(
                   containerColor = Color.White,
                   contentColor = SkyBluePrimary
@@ -614,7 +613,7 @@ fun HomeScreen(
       onDismissRequest = { showHelpDialog = false },
       title = {
         Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "Benin City Property Support" else "Benin City Help Desk",
+          text = if (currentLanguage == AppLanguage.ENGLISH) "Contact Dwello Homes" else "Reach Dwello Homes Support",
           fontWeight = FontWeight.Bold,
           color = DeepNavyText
         )
@@ -623,14 +622,14 @@ fun HomeScreen(
         Column {
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH)
-              "We help tenants and landlords in Benin City connect safely. You can reach our local assistance team on WhatsApp or direct call."
+              "Dwello Homes connects you with property owners and coordinates physical property inspections in Benin City. Contact our support team for enquiries."
             else
-              "We dey help tenants and landlords for Benin City connect without wahala. You fit call our team direct or chat WhatsApp anytime.",
+              "Dwello Homes dey connect you with house owner and arrange physical inspection for Benin City. Call our team anytime.",
             style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText)
           )
           Spacer(modifier = Modifier.height(12.dp))
           Text(
-            text = "📞 Phone: +234 800 393 556\n💬 WhatsApp: +234 803 123 4567\n📍 Benin Office: Ring Road Axis, Edo State",
+            text = "📞 Phone: +234 800 393 556\n💬 WhatsApp: +234 803 123 4567\n📍 Benin Hub: Ring Road Axis, Edo State",
             style = MaterialTheme.typography.bodySmall.copy(
               color = SkyBlueDark,
               fontWeight = FontWeight.SemiBold,
@@ -659,15 +658,27 @@ fun HomeScreen(
     )
   }
 
+  // Send Enquiry Dialog
+  enquiryProperty?.let { prop ->
+    EnquirySubmissionDialog(
+      property = prop,
+      currentLanguage = currentLanguage,
+      onDismiss = { enquiryProperty = null },
+      onSubmit = {
+        enquiryProperty = null
+      }
+    )
+  }
+
   // Property Details Dialog
   selectedPropertyForDetails?.let { prop ->
     PropertyDetailDialog(
       property = prop,
       currentLanguage = currentLanguage,
       onDismiss = { selectedPropertyForDetails = null },
-      onCall = {
-        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${prop.phoneContact.replace(" ", "")}"))
-        context.startActivity(intent)
+      onEnquire = {
+        selectedPropertyForDetails = null
+        enquiryProperty = prop
       }
     )
   }
@@ -678,7 +689,7 @@ fun PropertyCard(
   property: PropertyItem,
   currentLanguage: AppLanguage,
   onClick: () -> Unit,
-  onCallClick: () -> Unit,
+  onEnquiryClick: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   Card(
@@ -884,7 +895,7 @@ fun PropertyCard(
         HorizontalDivider(color = SoftBlueBorder.copy(alpha = 0.5f))
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Landlord name & Call action
+        // Property owner notice & Intermediary Send Enquiry action
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.SpaceBetween,
@@ -899,29 +910,29 @@ fun PropertyCard(
               )
             )
             Text(
-              text = if (currentLanguage == AppLanguage.ENGLISH) property.landlordRoleEn else property.landlordRolePidgin,
-              style = MaterialTheme.typography.labelSmall.copy(color = NavyTextSecondary)
+              text = "Via Dwello Homes",
+              style = MaterialTheme.typography.labelSmall.copy(color = SkyBluePrimary, fontWeight = FontWeight.SemiBold)
             )
           }
 
           Button(
-            onClick = onCallClick,
+            onClick = onEnquiryClick,
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(
               containerColor = SkyBluePrimary,
               contentColor = Color.White
             ),
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-            modifier = Modifier.testTag("call_landlord_btn_${property.id}")
+            modifier = Modifier.testTag("send_enquiry_btn_${property.id}")
           ) {
             Icon(
-              imageVector = Icons.Default.Phone,
+              imageVector = Icons.Default.Send,
               contentDescription = null,
-              modifier = Modifier.size(16.dp)
+              modifier = Modifier.size(15.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-              text = DwelloStrings.tapToCall(currentLanguage),
+              text = DwelloStrings.sendEnquiry(currentLanguage),
               style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
             )
           }
@@ -932,11 +943,152 @@ fun PropertyCard(
 }
 
 @Composable
+fun EnquirySubmissionDialog(
+  property: PropertyItem,
+  currentLanguage: AppLanguage,
+  onDismiss: () -> Unit,
+  onSubmit: () -> Unit
+) {
+  var tenantName by remember { mutableStateOf("") }
+  var tenantPhone by remember { mutableStateOf("") }
+  var inspectionDate by remember { mutableStateOf("This Weekend") }
+  var submitted by remember { mutableStateOf(false) }
+
+  if (!submitted) {
+    AlertDialog(
+      onDismissRequest = onDismiss,
+      title = {
+        Text(
+          text = if (currentLanguage == AppLanguage.ENGLISH) "Send Enquiry via Dwello Homes" else "Send Enquiry to Dwello Homes",
+          fontWeight = FontWeight.Bold,
+          color = DeepNavyText,
+          fontSize = 18.sp
+        )
+      },
+      text = {
+        Column(modifier = Modifier.fillMaxWidth()) {
+          Text(
+            text = "Property: ${property.titleEn} (${property.area})",
+            style = MaterialTheme.typography.bodyMedium.copy(
+              fontWeight = FontWeight.Bold,
+              color = SkyBluePrimary
+            )
+          )
+          Spacer(modifier = Modifier.height(4.dp))
+          Text(
+            text = if (currentLanguage == AppLanguage.ENGLISH)
+              "Dwello Homes will connect you with the landlord and coordinate your physical inspection."
+            else
+              "Dwello Homes go connect you with the landlord and arrange your inspection date.",
+            style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+          )
+          Spacer(modifier = Modifier.height(12.dp))
+
+          OutlinedTextField(
+            value = tenantName,
+            onValueChange = { tenantName = it },
+            label = { Text("Your Name") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedContainerColor = VeryLightBlueBackground,
+              unfocusedContainerColor = VeryLightBlueBackground,
+              focusedBorderColor = SkyBluePrimary,
+              unfocusedBorderColor = SoftBlueBorder
+            )
+          )
+
+          Spacer(modifier = Modifier.height(8.dp))
+
+          OutlinedTextField(
+            value = tenantPhone,
+            onValueChange = { tenantPhone = it },
+            label = { Text("Phone Number") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedContainerColor = VeryLightBlueBackground,
+              unfocusedContainerColor = VeryLightBlueBackground,
+              focusedBorderColor = SkyBluePrimary,
+              unfocusedBorderColor = SoftBlueBorder
+            )
+          )
+
+          Spacer(modifier = Modifier.height(8.dp))
+
+          OutlinedTextField(
+            value = inspectionDate,
+            onValueChange = { inspectionDate = it },
+            label = { Text("Preferred Inspection Time") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedContainerColor = VeryLightBlueBackground,
+              unfocusedContainerColor = VeryLightBlueBackground,
+              focusedBorderColor = SkyBluePrimary,
+              unfocusedBorderColor = SoftBlueBorder
+            )
+          )
+        }
+      },
+      confirmButton = {
+        Button(
+          onClick = { submitted = true },
+          colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
+        ) {
+          Text("Submit Enquiry")
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = onDismiss) {
+          Text("Cancel", color = NavyTextSecondary)
+        }
+      }
+    )
+  } else {
+    AlertDialog(
+      onDismissRequest = onDismiss,
+      title = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SkyBluePrimary)
+          Spacer(modifier = Modifier.width(8.dp))
+          Text(
+            text = "Enquiry Submitted!",
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
+          )
+        }
+      },
+      text = {
+        Text(
+          text = if (currentLanguage == AppLanguage.ENGLISH)
+            "Your enquiry for ${property.titleEn} in ${property.area} has been received by Dwello Homes. We will contact the property owner and update you shortly."
+          else
+            "Dwello Homes don receive your enquiry for ${property.titleEn}. We go contact the house owner and get back to you sharp sharp.",
+          style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText)
+        )
+      },
+      confirmButton = {
+        Button(
+          onClick = {
+            onSubmit()
+            onDismiss()
+          },
+          colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
+        ) {
+          Text("Done")
+        }
+      }
+    )
+  }
+}
+
+@Composable
 fun PropertyDetailDialog(
   property: PropertyItem,
   currentLanguage: AppLanguage,
   onDismiss: () -> Unit,
-  onCall: () -> Unit
+  onEnquire: () -> Unit
 ) {
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -1029,14 +1181,14 @@ fun PropertyDetailDialog(
           ) {
             Column(modifier = Modifier.padding(12.dp)) {
               Text(
-                text = "Contact: ${property.landlordName} (${if (currentLanguage == AppLanguage.ENGLISH) property.landlordRoleEn else property.landlordRolePidgin})",
+                text = "Property Owner: ${property.landlordName}",
                 style = MaterialTheme.typography.bodyMedium.copy(
                   fontWeight = FontWeight.Bold,
                   color = DeepNavyText
                 )
               )
               Text(
-                text = "Phone: ${property.phoneContact}",
+                text = "Intermediary: Dwello Homes coordinates all physical inspections and communications directly with the landlord.",
                 style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
               )
             }
@@ -1046,12 +1198,12 @@ fun PropertyDetailDialog(
     },
     confirmButton = {
       Button(
-        onClick = onCall,
+        onClick = onEnquire,
         colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
       ) {
-        Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
+        Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
         Spacer(modifier = Modifier.width(6.dp))
-        Text("Call Now")
+        Text(DwelloStrings.sendEnquiry(currentLanguage))
       }
     },
     dismissButton = {

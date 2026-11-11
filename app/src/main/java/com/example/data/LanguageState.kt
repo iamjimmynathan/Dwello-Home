@@ -44,28 +44,28 @@ object DwelloStrings {
   }
 
   fun postHouseSubtext(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "For landlords, agents & caretakers"
-    AppLanguage.PIDGIN -> "For landlord, agent & caretaker"
+    AppLanguage.ENGLISH -> "For landlords & property owners"
+    AppLanguage.PIDGIN -> "For landlords & house owners"
   }
 
   fun needHelpTitle(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Need help? Contact a landlord or agent."
-    AppLanguage.PIDGIN -> "You need help? Call landlord or agent."
+    AppLanguage.ENGLISH -> "Need help? Contact Dwello Homes."
+    AppLanguage.PIDGIN -> "You need help? Reach Dwello Homes."
   }
 
   fun needHelpSubtext(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Direct phone line and WhatsApp support for Benin City residents"
-    AppLanguage.PIDGIN -> "Call direct or chat for WhatsApp sharp sharp"
+    AppLanguage.ENGLISH -> "We connect tenants and landlords, and coordinate house inspections in Benin City"
+    AppLanguage.PIDGIN -> "We dey connect tenants and landlords, and arrange house inspection for Benin"
   }
 
   fun callDirect(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Call Help Desk"
-    AppLanguage.PIDGIN -> "Call Us Direct"
+    AppLanguage.ENGLISH -> "Call Dwello"
+    AppLanguage.PIDGIN -> "Call Dwello"
   }
 
   fun chatWhatsapp(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "WhatsApp Agent"
-    AppLanguage.PIDGIN -> "Chat for WhatsApp"
+    AppLanguage.ENGLISH -> "WhatsApp Dwello"
+    AppLanguage.PIDGIN -> "Chat Dwello"
   }
 
   fun popularAreasTitle(lang: AppLanguage): String = when (lang) {
@@ -88,14 +88,14 @@ object DwelloStrings {
     AppLanguage.PIDGIN -> "/ per year"
   }
 
-  fun tapToCall(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Call Landlord"
-    AppLanguage.PIDGIN -> "Call Landlord"
+  fun sendEnquiry(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Send Enquiry"
+    AppLanguage.PIDGIN -> "Send Enquiry"
   }
 
-  fun tapToChat(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Message"
-    AppLanguage.PIDGIN -> "Send Message"
+  fun bookInspection(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Book Inspection"
+    AppLanguage.PIDGIN -> "Book Inspection"
   }
 
   // Navigation tab labels
@@ -115,8 +115,8 @@ object DwelloStrings {
   }
 
   fun navMessages(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Messages"
-    AppLanguage.PIDGIN -> "Messages"
+    AppLanguage.ENGLISH -> "Enquiries"
+    AppLanguage.PIDGIN -> "Enquiries"
   }
 
   fun navProfile(lang: AppLanguage): String = when (lang) {
@@ -126,13 +126,13 @@ object DwelloStrings {
 
   // Post house form strings
   fun postHouseHeader(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Post Your Property in Benin City"
-    AppLanguage.PIDGIN -> "Put Your House for Benin City"
+    AppLanguage.ENGLISH -> "List Property with Dwello Homes"
+    AppLanguage.PIDGIN -> "Put Your House for Dwello Homes"
   }
 
   fun postHouseInstruction(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Fill this simple form. Tenants in Benin City will call you directly."
-    AppLanguage.PIDGIN -> "Fill this simple form. Tenants for Benin will call your phone straight."
+    AppLanguage.ENGLISH -> "Fill this form. Dwello Homes will connect verified tenants directly with you."
+    AppLanguage.PIDGIN -> "Fill this form. Dwello Homes go connect tenants to your house direct."
   }
 
   // Language switch indicator

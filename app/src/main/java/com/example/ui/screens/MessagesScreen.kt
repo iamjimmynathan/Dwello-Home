@@ -84,46 +84,46 @@ fun MessagesScreen(
 
   val chatMessages = remember {
     mutableStateListOf(
-      "Good day! Is the self-contained apartment at Uselu still vacant?",
-      "Yes, it is very much available. You can come for physical inspection anytime today.",
-      "Is the running water constant and light reliable in that compound?",
-      "Yes! We have steady borehole water and personal prepaid meter. No NEPA arguments."
+      "Hello! I submitted an enquiry for the Self-Con apartment at Uselu / Ugbowo.",
+      "Hello! Dwello Homes has notified the landlord, Mr. Osasere. The house is available.",
+      "When can we schedule the physical inspection?",
+      "Inspection is confirmed for this Saturday by 11:00 AM. A Dwello coordinator will accompany you."
     )
   }
 
   val quickQuestions = listOf(
-    if (currentLanguage == AppLanguage.ENGLISH) "Is this house still available?" else "House still dey available?",
-    if (currentLanguage == AppLanguage.ENGLISH) "When can I come for inspection?" else "When I fit come check the house?",
-    if (currentLanguage == AppLanguage.ENGLISH) "Is caution fee included?" else "Caution fee dey inside?"
+    if (currentLanguage == AppLanguage.ENGLISH) "When is the inspection slot?" else "When na the inspection time?",
+    if (currentLanguage == AppLanguage.ENGLISH) "Has landlord confirmed?" else "Landlord don agree?",
+    if (currentLanguage == AppLanguage.ENGLISH) "Can I pay rent direct to landlord?" else "I fit pay rent direct to landlord?"
   )
 
   val mockChats = listOf(
     ChatItem(
       id = "chat_1",
-      senderName = "Mr. Osasere",
-      role = if (currentLanguage == AppLanguage.ENGLISH) "Landlord (Uselu)" else "Landlord (Uselu)",
+      senderName = "Dwello Inspection Desk",
+      role = if (currentLanguage == AppLanguage.ENGLISH) "Intermediary Service" else "Dwello Intermediary",
       propertyTitle = "Self-Con at Uselu / Ugbowo",
-      lastMessage = "Yes, it is very much available. You can come for inspection...",
+      lastMessage = "Inspection is confirmed for this Saturday by 11:00 AM...",
       time = "10:30 AM",
-      phone = "08031234567",
+      phone = "0800393556",
       unread = true
     ),
     ChatItem(
       id = "chat_2",
-      senderName = "Chief Ighodaro",
-      role = if (currentLanguage == AppLanguage.ENGLISH) "Caretaker (GRA)" else "Caretaker (GRA)",
+      senderName = "Dwello Landlord Liaison",
+      role = if (currentLanguage == AppLanguage.ENGLISH) "Chief Ighodaro (Landlord)" else "Chief Ighodaro (House Owner)",
       propertyTitle = "2-Bedroom Flat in GRA",
-      lastMessage = "Inspection is available on Saturday by 11 AM.",
+      lastMessage = "Landlord has accepted your inspection request for next Tuesday.",
       time = "Yesterday",
-      phone = "08029876543",
+      phone = "0800393556",
       unread = false
     ),
     ChatItem(
       id = "chat_3",
-      senderName = "DWELLO Help Desk",
-      role = if (currentLanguage == AppLanguage.ENGLISH) "Benin Support" else "Benin Support",
-      propertyTitle = "House Search Assistance",
-      lastMessage = "Welcome to DWELLO HOMES! Need help finding houses in Benin City?",
+      senderName = "Dwello Support Benin",
+      role = if (currentLanguage == AppLanguage.ENGLISH) "Tenant Support Desk" else "Customer Support Desk",
+      propertyTitle = "General Rental Enquiries",
+      lastMessage = "Welcome to Dwello Homes! We help you connect with verified landlords.",
       time = "2 days ago",
       phone = "0800393556",
       unread = false
@@ -151,7 +151,7 @@ fun MessagesScreen(
       ) {
         item {
           Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH) "Landlord & Agent Inquiries" else "Messages with Landlord & Agents",
+            text = if (currentLanguage == AppLanguage.ENGLISH) "Dwello Enquiries & Inspections" else "Enquiries & House Inspections",
             style = MaterialTheme.typography.titleLarge.copy(
               fontWeight = FontWeight.ExtraBold,
               color = DeepNavyText
@@ -159,9 +159,9 @@ fun MessagesScreen(
           )
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH)
-              "Chat directly about inspection times and house availability"
+              "Dwello Homes connects you with landlords and facilitates physical property inspections"
             else
-              "Chat direct to agree time for inspection and house availability",
+              "Dwello Homes dey connect you with house owners and arrange inspection",
             style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
           )
           Spacer(modifier = Modifier.height(14.dp))
@@ -193,7 +193,7 @@ fun MessagesScreen(
                 contentAlignment = Alignment.Center
               ) {
                 Text(
-                  text = chat.senderName.take(1),
+                  text = "D",
                   style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -284,11 +284,11 @@ fun MessagesScreen(
 
             IconButton(
               onClick = {
-                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${chat.phone}"))
+                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:0800393556"))
                 context.startActivity(intent)
               }
             ) {
-              Icon(imageVector = Icons.Default.Call, contentDescription = "Call", tint = SkyBluePrimary)
+              Icon(imageVector = Icons.Default.Call, contentDescription = "Call Dwello Support", tint = SkyBluePrimary)
             }
           }
         }
@@ -309,7 +309,7 @@ fun MessagesScreen(
                 .padding(vertical = 4.dp)
             ) {
               Text(
-                text = "Inquiry for: ${chat.propertyTitle}",
+                text = "Enquiry: ${chat.propertyTitle} • Coordinated via Dwello Homes",
                 modifier = Modifier.padding(8.dp),
                 style = MaterialTheme.typography.labelMedium.copy(
                   fontWeight = FontWeight.Bold,
@@ -343,7 +343,7 @@ fun MessagesScreen(
           }
         }
 
-        // Quick suggested inquiry pills
+        // Quick suggested enquiry pills
         LazyRow(
           modifier = Modifier
             .fillMaxWidth()
@@ -387,7 +387,7 @@ fun MessagesScreen(
             OutlinedTextField(
               value = messageInput,
               onValueChange = { messageInput = it },
-              placeholder = { Text("Type message...") },
+              placeholder = { Text("Send message to Dwello Homes...") },
               modifier = Modifier
                 .weight(1f)
                 .testTag("chat_input_field"),

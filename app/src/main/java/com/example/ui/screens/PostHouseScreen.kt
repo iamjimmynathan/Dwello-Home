@@ -119,7 +119,7 @@ fun PostHouseScreen(
       hasBorehole = hasWater,
       hasPrepaidMeter = hasPrepaidMeter,
       landlordName = landlordName.ifBlank { "Property Owner" },
-      landlordRoleEn = "Landlord / Caretaker",
+      landlordRoleEn = "Landlord (Property Owner)",
       landlordRolePidgin = "House Owner",
       phoneContact = phoneNumber.ifBlank { "0803 000 0000" },
       descriptionEn = "Quality $houseType in $selectedArea, Benin City. ${if (streetAddress.isNotBlank()) "Location: $streetAddress. " else ""}Features borehole running water, prepaid meter, and secure compound.",
@@ -534,7 +534,7 @@ fun PostHouseScreen(
       // Step 6: Contact Information
       item {
         Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "6. Landlord / Agent Phone" else "6. Phone number to receive calls",
+          text = if (currentLanguage == AppLanguage.ENGLISH) "6. Landlord Phone Number" else "6. Phone number to receive calls",
           style = MaterialTheme.typography.titleSmall.copy(
             fontWeight = FontWeight.Bold,
             color = DeepNavyText
@@ -684,7 +684,7 @@ fun PostHouseScreen(
             property = previewProperty,
             currentLanguage = currentLanguage,
             onClick = {},
-            onCallClick = {}
+            onEnquiryClick = {}
           )
         }
       },
