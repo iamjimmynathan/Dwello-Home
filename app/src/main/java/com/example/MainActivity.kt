@@ -43,6 +43,7 @@ import com.example.data.AppLanguage
 import com.example.data.DwelloStrings
 import com.example.ui.screens.FindHousesScreen
 import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.LandlordDashboardScreen
 import com.example.ui.screens.MessagesScreen
 import com.example.ui.screens.PostHouseScreen
 import com.example.ui.screens.ProfileScreen
@@ -58,7 +59,8 @@ enum class DwelloNavScreen {
   FIND_HOUSES,
   POST_HOUSE,
   MESSAGES,
-  PROFILE
+  PROFILE,
+  LANDLORD_DASHBOARD
 }
 
 class MainActivity : ComponentActivity() {
@@ -222,8 +224,8 @@ fun DwelloApp() {
           modifier = Modifier.testTag("nav_item_messages")
         )
 
-        // 5. Profile
-        val isProfile = currentScreen == DwelloNavScreen.PROFILE
+        // 5. Profile / Landlord
+        val isProfile = currentScreen == DwelloNavScreen.PROFILE || currentScreen == DwelloNavScreen.LANDLORD_DASHBOARD
         NavigationBarItem(
           selected = isProfile,
           onClick = { currentScreen = DwelloNavScreen.PROFILE },
@@ -318,6 +320,24 @@ fun DwelloApp() {
             onLanguageSelected = { newLang -> currentLanguage = newLang },
             onLanguageToggle = {
               currentLanguage = if (currentLanguage == AppLanguage.ENGLISH) AppLanguage.PIDGIN else AppLanguage.ENGLISH
+            },
+            onNavigateToLandlordDashboard = {
+              currentScreen = DwelloNavScreen.LANDLORD_DASHBOARD
+            }
+          )
+        }
+
+        DwelloNavScreen.LANDLORD_DASHBOARD -> {
+          LandlordDashboardScreen(
+            currentLanguage = currentLanguage,
+            onLanguageToggle = {
+              currentLanguage = if (currentLanguage == AppLanguage.ENGLISH) AppLanguage.PIDGIN else AppLanguage.ENGLISH
+            },
+            onNavigateToPostHouse = {
+              currentScreen = DwelloNavScreen.POST_HOUSE
+            },
+            onBackToHome = {
+              currentScreen = DwelloNavScreen.PROFILE
             }
           )
         }

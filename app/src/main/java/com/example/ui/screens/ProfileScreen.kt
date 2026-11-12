@@ -53,9 +53,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
 import com.example.data.AppLanguage
+import com.example.data.DwelloStrings
 import com.example.data.PropertyApprovalStatus
 import com.example.data.SamplePropertyData
 import com.example.ui.components.DwelloHeader
@@ -79,6 +83,7 @@ fun ProfileScreen(
   currentLanguage: AppLanguage,
   onLanguageSelected: (AppLanguage) -> Unit,
   onLanguageToggle: () -> Unit,
+  onNavigateToLandlordDashboard: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
@@ -306,38 +311,107 @@ fun ProfileScreen(
         Spacer(modifier = Modifier.height(18.dp))
       }
 
-      // Landlord's Properties & Approval Review Section
+      // Landlord's Properties & Dashboard Section (Stage 3A)
       if (selectedRole == UserRole.LANDLORD) {
+        val landlordProperties = SamplePropertyData.getLandlordProperties()
+        val stats = SamplePropertyData.getLandlordStats()
+
         item {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+          // Prominent Button to open full Landlord Dashboard
+          Button(
+            onClick = onNavigateToLandlordDashboard,
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(56.dp)
+              .testTag("open_landlord_dashboard_button"),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(
+              containerColor = SkyBluePrimary,
+              contentColor = Color.White
+            ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
           ) {
+            Icon(
+              imageVector = Icons.Default.Home,
+              contentDescription = null,
+              tint = Color.White,
+              modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
             Text(
-              text = if (currentLanguage == AppLanguage.ENGLISH) "Property Approval Status (Admin Review)" else "Property Status & Admin Review",
-              style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Bold,
-                color = DeepNavyText
+              text = if (currentLanguage == AppLanguage.ENGLISH)
+                "OPEN FULL LANDLORD DASHBOARD"
+              else
+                "OPEN LANDLORD OFFICE",
+              style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 15.sp,
+                letterSpacing = 0.5.sp
               )
             )
           }
-          Spacer(modifier = Modifier.height(6.dp))
+
+          Spacer(modifier = Modifier.height(16.dp))
+
+          // Portfolio Quick Summary Stats Card
+          Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
+            border = BorderStroke(1.dp, SoftBlueBorder)
+          ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+              Text(
+                text = "Portfolio Summary",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = DeepNavyText)
+              )
+              Spacer(modifier = Modifier.height(8.dp))
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+              ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                  Text(text = "${stats.totalProperties}", fontWeight = FontWeight.Bold, color = DeepNavyText, fontSize = 18.sp)
+                  Text(text = "Total", style = MaterialTheme.typography.labelSmall, color = NavyTextSecondary)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                  Text(text = "${stats.approvedCount}", fontWeight = FontWeight.Bold, color = Color(0xFF1B5E20), fontSize = 18.sp)
+                  Text(text = "Approved", style = MaterialTheme.typography.labelSmall, color = NavyTextSecondary)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                  Text(text = "${stats.pendingCount}", fontWeight = FontWeight.Bold, color = Color(0xFFB45309), fontSize = 18.sp)
+                  Text(text = "Pending", style = MaterialTheme.typography.labelSmall, color = NavyTextSecondary)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                  Text(text = "${stats.rejectedCount}", fontWeight = FontWeight.Bold, color = Color(0xFFDC2626), fontSize = 18.sp)
+                  Text(text = "Rejected", style = MaterialTheme.typography.labelSmall, color = NavyTextSecondary)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                  Text(text = "${stats.newEnquiriesCount}", fontWeight = FontWeight.Bold, color = SkyBluePrimary, fontSize = 18.sp)
+                  Text(text = "Enquiries", style = MaterialTheme.typography.labelSmall, color = NavyTextSecondary)
+                }
+              }
+            }
+          }
+
+          Spacer(modifier = Modifier.height(16.dp))
+
           Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH)
-              "Demonstration controls: Test the business rule that only Approved properties appear in public Find Houses searches."
-            else
-              "Demo controls: Test say na only Approved house dey show for Find Houses.",
-            style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+            text = DwelloStrings.myPropertiesHeading(currentLanguage),
+            style = MaterialTheme.typography.titleSmall.copy(
+              fontWeight = FontWeight.Bold,
+              color = DeepNavyText
+            )
           )
-          Spacer(modifier = Modifier.height(10.dp))
+          Spacer(modifier = Modifier.height(8.dp))
         }
 
-        items(SamplePropertyData.dynamicProperties) { prop ->
+        items(landlordProperties) { prop ->
           Card(
             modifier = Modifier
               .fillMaxWidth()
-              .padding(bottom = 12.dp),
+              .padding(bottom = 12.dp)
+              .testTag("profile_landlord_prop_${prop.id}"),
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             border = BorderStroke(1.dp, CardBorderSubtle)
@@ -354,11 +428,11 @@ fun ProfileScreen(
                   modifier = Modifier.weight(1f)
                 )
 
-                // Status Badge
+                // Approval Status Badge
                 val (badgeColor, textColor, statusText) = when (prop.approvalStatus) {
                   PropertyApprovalStatus.PENDING_APPROVAL -> Triple(Color(0xFFFEF3C7), Color(0xFF92400E), "Pending Approval")
-                  PropertyApprovalStatus.APPROVED -> Triple(SoftBlueAccent, SkyBlueDark, "Approved (Live)")
-                  PropertyApprovalStatus.REJECTED -> Triple(Color(0xFFFEE2E2), Color(0xFF991B1B), "Rejected (Hidden)")
+                  PropertyApprovalStatus.APPROVED -> Triple(Color(0xFFE8F5E9), Color(0xFF1B5E20), "Approved (Live)")
+                  PropertyApprovalStatus.REJECTED -> Triple(Color(0xFFFEE2E2), Color(0xFF991B1B), "Rejected")
                   PropertyApprovalStatus.UNAVAILABLE -> Triple(Color(0xFFF1F5F9), Color(0xFF475569), "Unavailable")
                 }
 
@@ -380,66 +454,76 @@ fun ProfileScreen(
                 style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
               )
 
+              // Display Rejection Reason if Rejected
+              if (prop.approvalStatus == PropertyApprovalStatus.REJECTED && !prop.rejectionReason.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                  color = Color(0xFFFEF2F2),
+                  shape = RoundedCornerShape(8.dp),
+                  border = BorderStroke(1.dp, Color(0xFFFECACA)),
+                  modifier = Modifier.fillMaxWidth()
+                ) {
+                  Column(modifier = Modifier.padding(8.dp)) {
+                    Text(
+                      text = "Dwello Moderation Note:",
+                      style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = Color(0xFF991B1B))
+                    )
+                    Text(
+                      text = prop.rejectionReason,
+                      style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF7F1D1D), fontSize = 11.sp)
+                    )
+                  }
+                }
+              }
+
               Spacer(modifier = Modifier.height(10.dp))
               HorizontalDivider(color = SoftBlueBorder.copy(alpha = 0.5f))
               Spacer(modifier = Modifier.height(10.dp))
 
-              // Admin Action Buttons to test business rules
-              Text(
-                text = "Admin Demonstration Actions:",
-                style = MaterialTheme.typography.labelSmall.copy(color = NavyTextSecondary, fontWeight = FontWeight.SemiBold)
-              )
-              Spacer(modifier = Modifier.height(6.dp))
-
+              // Actions: Edit Listing & Mark as Unavailable (No self-approval buttons!)
               Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
               ) {
-                // Approve Button
+                // Edit Listing
+                OutlinedButton(
+                  onClick = onNavigateToLandlordDashboard,
+                  modifier = Modifier.weight(1f).height(38.dp),
+                  shape = RoundedCornerShape(8.dp),
+                  border = BorderStroke(1.dp, SkyBluePrimary),
+                  contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                  Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp), tint = SkyBluePrimary)
+                  Spacer(modifier = Modifier.width(4.dp))
+                  Text("Edit Listing", fontSize = 12.sp, color = SkyBluePrimary, fontWeight = FontWeight.Bold)
+                }
+
+                // Toggle Unavailable
+                val isUnavailable = prop.approvalStatus == PropertyApprovalStatus.UNAVAILABLE
                 Button(
                   onClick = {
-                    SamplePropertyData.updatePropertyStatus(prop.id, PropertyApprovalStatus.APPROVED)
+                    SamplePropertyData.toggleListingAvailability(prop.id)
                   },
-                  modifier = Modifier.weight(1f).height(38.dp),
+                  modifier = Modifier.weight(1.2f).height(38.dp),
                   colors = ButtonDefaults.buttonColors(
-                    containerColor = if (prop.approvalStatus == PropertyApprovalStatus.APPROVED) Color(0xFF0284C7) else SkyBluePrimary
+                    containerColor = if (isUnavailable) SkyBluePrimary else Color(0xFFF1F5F9),
+                    contentColor = if (isUnavailable) Color.White else DeepNavyText
                   ),
                   shape = RoundedCornerShape(8.dp),
                   contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                 ) {
-                  Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp))
+                  Icon(
+                    imageVector = if (isUnavailable) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = if (isUnavailable) Color.White else DeepNavyText
+                  )
                   Spacer(modifier = Modifier.width(4.dp))
-                  Text("Approve", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-
-                // Reject Button
-                OutlinedButton(
-                  onClick = {
-                    SamplePropertyData.updatePropertyStatus(prop.id, PropertyApprovalStatus.REJECTED)
-                  },
-                  modifier = Modifier.weight(1f).height(38.dp),
-                  border = BorderStroke(1.dp, Color(0xFFDC2626)),
-                  shape = RoundedCornerShape(8.dp),
-                  contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                ) {
-                  Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFFDC2626))
-                  Spacer(modifier = Modifier.width(4.dp))
-                  Text("Reject", fontSize = 12.sp, color = Color(0xFFDC2626), fontWeight = FontWeight.Bold)
-                }
-
-                // Unavailable Button
-                OutlinedButton(
-                  onClick = {
-                    SamplePropertyData.updatePropertyStatus(prop.id, PropertyApprovalStatus.UNAVAILABLE)
-                  },
-                  modifier = Modifier.weight(1.2f).height(38.dp),
-                  border = BorderStroke(1.dp, NavyTextSecondary),
-                  shape = RoundedCornerShape(8.dp),
-                  contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                ) {
-                  Icon(Icons.Default.VisibilityOff, contentDescription = null, modifier = Modifier.size(14.dp), tint = NavyTextSecondary)
-                  Spacer(modifier = Modifier.width(4.dp))
-                  Text("Unavailable", fontSize = 11.sp, color = DeepNavyText, fontWeight = FontWeight.Medium)
+                  Text(
+                    text = if (isUnavailable) "Make Available" else "Mark Unavailable",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                  )
                 }
               }
             }
@@ -447,6 +531,18 @@ fun ProfileScreen(
         }
 
         item {
+          Spacer(modifier = Modifier.height(8.dp))
+          Surface(
+            color = VeryLightBlueBackground,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Text(
+              text = "ℹ️ Landlords cannot approve their own listings. All new or edited properties are independently verified by Dwello Homes moderation before appearing live to tenants in Benin City.",
+              modifier = Modifier.padding(10.dp),
+              style = MaterialTheme.typography.bodySmall.copy(color = DeepNavyText, fontSize = 11.sp, lineHeight = 16.sp)
+            )
+          }
           Spacer(modifier = Modifier.height(14.dp))
         }
       }
