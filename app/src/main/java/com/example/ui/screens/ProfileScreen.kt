@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -48,12 +50,20 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.VisibilityOff
 import com.example.data.AppLanguage
+import com.example.data.PropertyApprovalStatus
+import com.example.data.SamplePropertyData
 import com.example.ui.components.DwelloHeader
 import com.example.ui.theme.CardBorderSubtle
 import com.example.ui.theme.DeepNavyText
 import com.example.ui.theme.MainBackgroundWhite
 import com.example.ui.theme.NavyTextSecondary
+import com.example.ui.theme.SkyBlueDark
 import com.example.ui.theme.SkyBluePrimary
 import com.example.ui.theme.SoftBlueAccent
 import com.example.ui.theme.SoftBlueBorder
@@ -283,9 +293,9 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                   text = if (currentLanguage == AppLanguage.ENGLISH)
-                    "• List your houses in Benin City for free on Dwello Homes.\n• Dwello Homes forwards genuine tenant enquiries directly to you.\n• We help arrange tenant inspection appointments.\n• Direct rent payment between you and your tenant."
+                    "• List your houses in Benin City for free on Dwello Homes.\n• All listings undergo Dwello Homes intermediary verification.\n• Newly posted properties start as 'Pending Approval'.\n• Only 'Approved' properties appear in public searches.\n• Rejected and Unavailable properties remain completely hidden."
                   else
-                    "• Put your house for Benin City free of charge for Dwello Homes.\n• Dwello Homes go send serious tenants enquiry direct to you.\n• We go help arrange tenant inspection.\n• Tenant go pay you your rent direct.",
+                    "• Put your house for Benin City free of charge for Dwello Homes.\n• Dwello Homes must check and verify your house first.\n• New house go start as 'Pending Approval'.\n• Na only 'Approved' house go show for public search.\n• Rejected or Unavailable house go hide completely.",
                   style = MaterialTheme.typography.bodySmall.copy(color = DeepNavyText, lineHeight = 20.sp)
                 )
               }
@@ -294,6 +304,151 @@ fun ProfileScreen(
         }
 
         Spacer(modifier = Modifier.height(18.dp))
+      }
+
+      // Landlord's Properties & Approval Review Section
+      if (selectedRole == UserRole.LANDLORD) {
+        item {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Text(
+              text = if (currentLanguage == AppLanguage.ENGLISH) "Property Approval Status (Admin Review)" else "Property Status & Admin Review",
+              style = MaterialTheme.typography.titleSmall.copy(
+                fontWeight = FontWeight.Bold,
+                color = DeepNavyText
+              )
+            )
+          }
+          Spacer(modifier = Modifier.height(6.dp))
+          Text(
+            text = if (currentLanguage == AppLanguage.ENGLISH)
+              "Demonstration controls: Test the business rule that only Approved properties appear in public Find Houses searches."
+            else
+              "Demo controls: Test say na only Approved house dey show for Find Houses.",
+            style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+          )
+          Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        items(SamplePropertyData.dynamicProperties) { prop ->
+          Card(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(bottom = 12.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            border = BorderStroke(1.dp, CardBorderSubtle)
+          ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Text(
+                  text = prop.titleEn,
+                  style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = DeepNavyText),
+                  modifier = Modifier.weight(1f)
+                )
+
+                // Status Badge
+                val (badgeColor, textColor, statusText) = when (prop.approvalStatus) {
+                  PropertyApprovalStatus.PENDING_APPROVAL -> Triple(Color(0xFFFEF3C7), Color(0xFF92400E), "Pending Approval")
+                  PropertyApprovalStatus.APPROVED -> Triple(SoftBlueAccent, SkyBlueDark, "Approved (Live)")
+                  PropertyApprovalStatus.REJECTED -> Triple(Color(0xFFFEE2E2), Color(0xFF991B1B), "Rejected (Hidden)")
+                  PropertyApprovalStatus.UNAVAILABLE -> Triple(Color(0xFFF1F5F9), Color(0xFF475569), "Unavailable")
+                }
+
+                Surface(
+                  color = badgeColor,
+                  shape = RoundedCornerShape(6.dp)
+                ) {
+                  Text(
+                    text = statusText,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = textColor)
+                  )
+                }
+              }
+
+              Spacer(modifier = Modifier.height(4.dp))
+              Text(
+                text = "📍 ${prop.area}, Benin City • ${prop.priceFormatted}",
+                style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+              )
+
+              Spacer(modifier = Modifier.height(10.dp))
+              HorizontalDivider(color = SoftBlueBorder.copy(alpha = 0.5f))
+              Spacer(modifier = Modifier.height(10.dp))
+
+              // Admin Action Buttons to test business rules
+              Text(
+                text = "Admin Demonstration Actions:",
+                style = MaterialTheme.typography.labelSmall.copy(color = NavyTextSecondary, fontWeight = FontWeight.SemiBold)
+              )
+              Spacer(modifier = Modifier.height(6.dp))
+
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+              ) {
+                // Approve Button
+                Button(
+                  onClick = {
+                    SamplePropertyData.updatePropertyStatus(prop.id, PropertyApprovalStatus.APPROVED)
+                  },
+                  modifier = Modifier.weight(1f).height(38.dp),
+                  colors = ButtonDefaults.buttonColors(
+                    containerColor = if (prop.approvalStatus == PropertyApprovalStatus.APPROVED) Color(0xFF0284C7) else SkyBluePrimary
+                  ),
+                  shape = RoundedCornerShape(8.dp),
+                  contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                  Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp))
+                  Spacer(modifier = Modifier.width(4.dp))
+                  Text("Approve", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Reject Button
+                OutlinedButton(
+                  onClick = {
+                    SamplePropertyData.updatePropertyStatus(prop.id, PropertyApprovalStatus.REJECTED)
+                  },
+                  modifier = Modifier.weight(1f).height(38.dp),
+                  border = BorderStroke(1.dp, Color(0xFFDC2626)),
+                  shape = RoundedCornerShape(8.dp),
+                  contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                  Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFFDC2626))
+                  Spacer(modifier = Modifier.width(4.dp))
+                  Text("Reject", fontSize = 12.sp, color = Color(0xFFDC2626), fontWeight = FontWeight.Bold)
+                }
+
+                // Unavailable Button
+                OutlinedButton(
+                  onClick = {
+                    SamplePropertyData.updatePropertyStatus(prop.id, PropertyApprovalStatus.UNAVAILABLE)
+                  },
+                  modifier = Modifier.weight(1.2f).height(38.dp),
+                  border = BorderStroke(1.dp, NavyTextSecondary),
+                  shape = RoundedCornerShape(8.dp),
+                  contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                ) {
+                  Icon(Icons.Default.VisibilityOff, contentDescription = null, modifier = Modifier.size(14.dp), tint = NavyTextSecondary)
+                  Spacer(modifier = Modifier.width(4.dp))
+                  Text("Unavailable", fontSize = 11.sp, color = DeepNavyText, fontWeight = FontWeight.Medium)
+                }
+              }
+            }
+          }
+        }
+
+        item {
+          Spacer(modifier = Modifier.height(14.dp))
+        }
       }
 
       // 3. Language Switcher Section

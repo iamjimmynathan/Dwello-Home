@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.AddHome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Visibility
@@ -126,6 +127,15 @@ fun PostHouseScreen(
       descriptionPidgin = "Clean $houseType for $selectedArea, Benin City. ${if (streetAddress.isNotBlank()) "Address: $streetAddress. " else ""}Water and prepaid light dey.",
       neighborhoodNote = streetAddress.ifBlank { "Benin City Residential Axis" },
       imageResId = selectedPhotoRes,
+      imageResList = listOf(selectedPhotoRes, R.drawable.img_benin_house_interior),
+      facilities = listOf(
+        if (hasWater) "Borehole Water" else "Water Container",
+        if (hasPrepaidMeter) "Prepaid Meter" else "Shared Meter",
+        if (isGated) "Gated Compound" else "Open Compound",
+        "Tiled Floor"
+      ),
+      rentalTerms = "1 Year advance rent. Inspection and tenant coordination managed via Dwello Homes.",
+      approvalStatus = com.example.data.PropertyApprovalStatus.PENDING_APPROVAL,
       isDemonstrationData = false
     )
   }
@@ -728,7 +738,7 @@ fun PostHouseScreen(
           )
           Spacer(modifier = Modifier.width(8.dp))
           Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH) "House Posted Successfully!" else "House Don Enter!",
+            text = if (currentLanguage == AppLanguage.ENGLISH) "Property Submitted for Review" else "House Don Enter for Review",
             fontWeight = FontWeight.Bold,
             color = DeepNavyText,
             fontSize = 18.sp
@@ -739,11 +749,38 @@ fun PostHouseScreen(
         Column {
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH)
-              "Your $houseType at $selectedArea, Benin City has been submitted and is now visible in the Find Houses tab. Interested tenants will contact you directly."
+              "Thank you! Your $houseType at $selectedArea, Benin City has been submitted to Dwello Homes."
             else
-              "Your $houseType for $selectedArea, Benin City don enter and dey show for Find Houses now. Tenants wey dey find house go call your phone.",
-            style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText, lineHeight = 20.sp)
+              "Thank you! Your $houseType for $selectedArea, Benin City don enter Dwello Homes.",
+            style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
           )
+          Spacer(modifier = Modifier.height(8.dp))
+          Surface(
+            color = Color(0xFFFEF3C7),
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Row(
+              modifier = Modifier.padding(10.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFD97706), modifier = Modifier.size(18.dp))
+              Spacer(modifier = Modifier.width(8.dp))
+              Column {
+                Text(
+                  text = "Status: Pending Approval",
+                  style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF92400E))
+                )
+                Text(
+                  text = if (currentLanguage == AppLanguage.ENGLISH)
+                    "Per Dwello Homes policy, an administrator will verify property details before approving it for public tenant listings."
+                  else
+                    "Dwello Homes admin go check the house details well before e go appear for public search.",
+                  style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF92400E), fontSize = 11.sp)
+                )
+              }
+            }
+          }
           Spacer(modifier = Modifier.height(10.dp))
           Surface(
             color = SoftBlueAccent,
@@ -766,7 +803,7 @@ fun PostHouseScreen(
           },
           colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
         ) {
-          Text("Done / View in Listings")
+          Text("Done", fontWeight = FontWeight.Bold)
         }
       }
     )

@@ -18,15 +18,30 @@ object DwelloStrings {
     AppLanguage.PIDGIN -> "Find correct house. Connect with legit landlords."
   }
 
+  // Find a house screen headers
+  fun findScreenTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Find your next home"
+    AppLanguage.PIDGIN -> "Find your next house"
+  }
+
+  fun findScreenSubtitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Let's find a place you'll love."
+    AppLanguage.PIDGIN -> "Make we find correct place wey you go love."
+  }
+
+  fun searchAreaPlaceholder(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Search by area or neighbourhood"
+    AppLanguage.PIDGIN -> "Search by area or street"
+  }
+
+  fun defaultLocation(lang: AppLanguage): String = "Benin City, Edo State"
+
   fun searchPlaceholder(lang: AppLanguage): String = when (lang) {
     AppLanguage.ENGLISH -> "Search area or location"
     AppLanguage.PIDGIN -> "Search area or street"
   }
 
-  fun initialLocation(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Benin City, Edo State"
-    AppLanguage.PIDGIN -> "Benin City, Edo State"
-  }
+  fun initialLocation(lang: AppLanguage): String = "Benin City, Edo State"
 
   fun findHouseButton(lang: AppLanguage): String = when (lang) {
     AppLanguage.ENGLISH -> "FIND A HOUSE"
@@ -83,9 +98,19 @@ object DwelloStrings {
     AppLanguage.PIDGIN -> "See All House"
   }
 
+  fun viewDetails(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "VIEW DETAILS"
+    AppLanguage.PIDGIN -> "VIEW DETAILS"
+  }
+
   fun perYear(lang: AppLanguage): String = when (lang) {
     AppLanguage.ENGLISH -> "/ year"
     AppLanguage.PIDGIN -> "/ per year"
+  }
+
+  fun perMonth(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "/ month"
+    AppLanguage.PIDGIN -> "/ per month"
   }
 
   fun sendEnquiry(lang: AppLanguage): String = when (lang) {
@@ -93,9 +118,75 @@ object DwelloStrings {
     AppLanguage.PIDGIN -> "Send Enquiry"
   }
 
+  fun sendEnquiryToDwello(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "SEND ENQUIRY TO DWELLO HOMES"
+    AppLanguage.PIDGIN -> "SEND ENQUIRY TO DWELLO HOMES"
+  }
+
   fun bookInspection(lang: AppLanguage): String = when (lang) {
     AppLanguage.ENGLISH -> "Book Inspection"
     AppLanguage.PIDGIN -> "Book Inspection"
+  }
+
+  // Filter labels
+  fun filterButton(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Filters"
+    AppLanguage.PIDGIN -> "Filter"
+  }
+
+  fun filterDialogTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Filter Houses"
+    AppLanguage.PIDGIN -> "Filter House"
+  }
+
+  fun propertyTypeLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Property Type"
+    AppLanguage.PIDGIN -> "Type of House"
+  }
+
+  fun rentBudgetLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Rent Budget (₦)"
+    AppLanguage.PIDGIN -> "Rent Budget (₦)"
+  }
+
+  fun minRentLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Min Rent"
+    AppLanguage.PIDGIN -> "Smallest Rent"
+  }
+
+  fun maxRentLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Max Rent"
+    AppLanguage.PIDGIN -> "Highest Rent"
+  }
+
+  fun rentalPeriodLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Rental Period"
+    AppLanguage.PIDGIN -> "Payment Time"
+  }
+
+  fun periodYearly(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Yearly"
+    AppLanguage.PIDGIN -> "Per Year"
+  }
+
+  fun periodMonthly(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Monthly"
+    AppLanguage.PIDGIN -> "Per Month"
+  }
+
+  fun periodAll(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "All Periods"
+    AppLanguage.PIDGIN -> "All"
+  }
+
+  fun applyFilters(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "APPLY FILTER"
+    AppLanguage.PIDGIN -> "APPLY FILTER"
+  }
+
+  fun resetFilters(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "RESET FILTERS"
+    AppLanguage.PIDGIN -> "CLEAR ALL"
   }
 
   // Navigation tab labels
@@ -131,8 +222,35 @@ object DwelloStrings {
   }
 
   fun postHouseInstruction(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Fill this form. Dwello Homes will connect verified tenants directly with you."
-    AppLanguage.PIDGIN -> "Fill this form. Dwello Homes go connect tenants to your house direct."
+    AppLanguage.ENGLISH -> "Fill this form. All submissions undergo Dwello Homes verification before approval."
+    AppLanguage.PIDGIN -> "Fill this form. Dwello Homes go check your house well before e approve am."
+  }
+
+  // Approval Status Labels
+  fun statusPending(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Pending Approval"
+    AppLanguage.PIDGIN -> "Under Review (Pending)"
+  }
+
+  fun statusApproved(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Approved & Live"
+    AppLanguage.PIDGIN -> "Approved (Live)"
+  }
+
+  fun statusRejected(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Rejected"
+    AppLanguage.PIDGIN -> "Rejected"
+  }
+
+  fun statusUnavailable(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Unavailable"
+    AppLanguage.PIDGIN -> "Not Available"
+  }
+
+  // Demonstration Notice
+  fun demoNotice(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Sample Demonstration Listing — Not a Real Property"
+    AppLanguage.PIDGIN -> "Sample Demo House — No Be Real House"
   }
 
   // Language switch indicator

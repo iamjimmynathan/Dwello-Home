@@ -414,7 +414,7 @@ fun HomeScreen(
       }
 
       // Property Cards with Photographs and Intermediary "Send Enquiry" Action
-      val displayedProperties = SamplePropertyData.dynamicProperties.take(3)
+      val displayedProperties = SamplePropertyData.getApprovedPublicProperties().take(3)
       items(displayedProperties) { property ->
         PropertyCard(
           property = property,

@@ -48,9 +48,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material.icons.filled.EventNote
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AppLanguage
+import com.example.data.EnquiryRepository
 import com.example.ui.components.DwelloHeader
 import com.example.ui.theme.CardBorderSubtle
 import com.example.ui.theme.DeepNavyText
@@ -165,6 +168,97 @@ fun MessagesScreen(
             style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
           )
           Spacer(modifier = Modifier.height(14.dp))
+        }
+
+        // Real-time Submitted Property Inspection Enquiries
+        if (EnquiryRepository.submittedEnquiries.isNotEmpty()) {
+          item {
+            Text(
+              text = if (currentLanguage == AppLanguage.ENGLISH) "Your Submitted Enquiries" else "Your House Enquiries",
+              style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = DeepNavyText
+              )
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+          }
+
+          items(EnquiryRepository.submittedEnquiries) { enq ->
+            Card(
+              modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+              shape = RoundedCornerShape(14.dp),
+              colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
+              border = BorderStroke(1.dp, SoftBlueBorder)
+            ) {
+              Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.SpaceBetween,
+                  verticalAlignment = Alignment.CenterVertically
+                ) {
+                  Surface(
+                    color = SkyBluePrimary,
+                    shape = RoundedCornerShape(6.dp)
+                  ) {
+                    Text(
+                      text = "Inspection Request",
+                      modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                      style = MaterialTheme.typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                    )
+                  }
+                  Text(
+                    text = enq.propertyPrice,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = SkyBluePrimary)
+                  )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                  text = enq.propertyTitle,
+                  style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = DeepNavyText)
+                )
+                Text(
+                  text = "📍 ${enq.propertyArea}, Benin City • For: ${enq.tenantName}",
+                  style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                  color = Color.White,
+                  shape = RoundedCornerShape(8.dp),
+                  border = BorderStroke(1.dp, SoftBlueBorder)
+                ) {
+                  Row(
+                    modifier = Modifier
+                      .fillMaxWidth()
+                      .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                  ) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SkyBluePrimary, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                      text = "Slot: ${enq.preferredInspectionDate} • Dwello Homes Coordinating",
+                      style = MaterialTheme.typography.labelSmall.copy(color = DeepNavyText, fontWeight = FontWeight.SemiBold)
+                    )
+                  }
+                }
+              }
+            }
+          }
+
+          item {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+              text = if (currentLanguage == AppLanguage.ENGLISH) "Inspection Channels & Support" else "Chat Channels & Support",
+              style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = DeepNavyText
+              )
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+          }
         }
 
         items(mockChats) { chat ->
