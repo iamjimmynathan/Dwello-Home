@@ -1,7 +1,9 @@
 package com.example.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -673,12 +675,21 @@ fun LandlordPropertyCard(
           .fillMaxWidth()
           .height(140.dp)
       ) {
-        Image(
-          painter = painterResource(id = property.imageResId),
-          contentDescription = property.titleEn,
-          modifier = Modifier.fillMaxSize(),
-          contentScale = ContentScale.Crop
-        )
+        if (property.photoUris.isNotEmpty()) {
+          AsyncImage(
+            model = Uri.parse(property.photoUris.first()),
+            contentDescription = property.titleEn,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+          )
+        } else {
+          Image(
+            painter = painterResource(id = property.imageResId),
+            contentDescription = property.titleEn,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+          )
+        }
 
         // Status Badge at top right
         val (badgeBg, badgeText, badgeIcon, statusLabel) = when (property.approvalStatus) {

@@ -344,4 +344,230 @@ object DwelloStrings {
     AppLanguage.ENGLISH -> "Privacy Protected: Your personal phone number is never exposed to tenants. Inspections and enquiries are coordinated through Dwello Homes."
     AppLanguage.PIDGIN -> "Privacy Protected: Tenants no go see your phone number. Dwello Homes dey coordinate all inspections."
   }
+
+  // --- STAGE 3B: POST A HOUSE WORKFLOW STRINGS ---
+  fun postHouseFormTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Post a Property"
+    AppLanguage.PIDGIN -> "Put House for Rent"
+  }
+
+  fun postHouseFormSubtitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Fill out the property details below. All submissions are reviewed by Dwello Homes before going live to tenants."
+    AppLanguage.PIDGIN -> "Fill the house details below. Dwello Homes go check am well before tenants go see am."
+  }
+
+  // Photos
+  fun sectionPhotosTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "1. Property Photos"
+    AppLanguage.PIDGIN -> "1. House Pictures"
+  }
+
+  fun photosInstruction(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Select photos from your device gallery. Clear photos of exterior, living room, and bedrooms help tenants inspect faster."
+    AppLanguage.PIDGIN -> "Pick clean pictures from your phone gallery. Pictures of compound gate, parlor, and rooms go help tenant quick."
+  }
+
+  fun selectPhotosBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Select Photos from Gallery"
+    AppLanguage.PIDGIN -> "Pick Pictures from Phone"
+  }
+
+  fun noPhotosSelected(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "No photos selected yet. Please select at least 1 photo."
+    AppLanguage.PIDGIN -> "You never pick picture. Pick at least 1 picture for the house."
+  }
+
+  fun selectedPhotosCount(lang: AppLanguage, count: Int): String = when (lang) {
+    AppLanguage.ENGLISH -> "Selected Photos ($count)"
+    AppLanguage.PIDGIN -> "Pictures Wey You Don Pick ($count)"
+  }
+
+  fun localPhotoNotice(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Honest Notice: Selected photos are previewed locally on your device for this submission."
+    AppLanguage.PIDGIN -> "Honest Notice: Pictures dey save for your phone here for now."
+  }
+
+  // Property Details
+  fun sectionDetailsTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "2. Property Details"
+    AppLanguage.PIDGIN -> "2. House Details"
+  }
+
+  fun titleLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Property Title"
+    AppLanguage.PIDGIN -> "House Title"
+  }
+
+  fun titlePlaceholder(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "e.g. Spacious 2-Bedroom Flat in Ugbowo"
+    AppLanguage.PIDGIN -> "e.g. Big 2-Bedroom Flat for Ugbowo"
+  }
+
+  fun errorTitleRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Please enter a property title"
+    AppLanguage.PIDGIN -> "Please write title for the house"
+  }
+
+  fun selectTypeLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Property Type"
+    AppLanguage.PIDGIN -> "Type of House"
+  }
+
+  fun errorTypeRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Please select a property type"
+    AppLanguage.PIDGIN -> "Please pick the type of house"
+  }
+
+  fun bedroomsCountLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Number of Bedrooms"
+    AppLanguage.PIDGIN -> "How Many Bedrooms"
+  }
+
+  fun bathroomsCountLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Number of Bathrooms"
+    AppLanguage.PIDGIN -> "How Many Bathrooms"
+  }
+
+  fun rentAmountLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Rent Amount (₦)"
+    AppLanguage.PIDGIN -> "Rent Money (₦)"
+  }
+
+  fun rentAmountPlaceholder(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "e.g. 450000"
+    AppLanguage.PIDGIN -> "e.g. 450000"
+  }
+
+  fun errorRentRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Rent amount must be greater than ₦0"
+    AppLanguage.PIDGIN -> "Rent money must be more than ₦0"
+  }
+
+  fun paymentPeriodLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Preferred Payment Period"
+    AppLanguage.PIDGIN -> "Payment Time"
+  }
+
+  fun periodYearlyOption(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Yearly (Per Year)"
+    AppLanguage.PIDGIN -> "Per Year"
+  }
+
+  fun periodMonthlyOption(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Monthly (Per Month)"
+    AppLanguage.PIDGIN -> "Per Month"
+  }
+
+  fun descriptionLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Property Description"
+    AppLanguage.PIDGIN -> "Talk About The House"
+  }
+
+  fun descriptionPlaceholder(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Describe the rooms, compound environment, road accessibility, and conditions..."
+    AppLanguage.PIDGIN -> "Talk about the rooms, compound, light and water situation..."
+  }
+
+  fun errorDescriptionRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Please provide a property description"
+    AppLanguage.PIDGIN -> "Please write small description for the house"
+  }
+
+  // Location
+  fun sectionLocationTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "3. Property Location in Benin City"
+    AppLanguage.PIDGIN -> "3. Where House Dey for Benin City"
+  }
+
+  fun neighbourhoodLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Select Neighbourhood"
+    AppLanguage.PIDGIN -> "Pick Area"
+  }
+
+  fun errorNeighbourhoodRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Please select a neighbourhood in Benin City"
+    AppLanguage.PIDGIN -> "Please pick the area in Benin City"
+  }
+
+  fun addressLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Full Address or Nearby Landmark"
+    AppLanguage.PIDGIN -> "Full Address or Nearest Bus Stop"
+  }
+
+  fun addressPlaceholder(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "e.g. 15 Boundary Road, off Sapele Road / Near UBTH Gate"
+    AppLanguage.PIDGIN -> "e.g. 15 Boundary Road, near UBTH Gate"
+  }
+
+  fun locationNotice(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Address is used by Dwello coordinators to schedule physical inspections. No automated GPS verification claimed."
+    AppLanguage.PIDGIN -> "Address dey help Dwello coordinator to arrange physical inspection. No fake GPS dey here."
+  }
+
+  // Facilities
+  fun sectionFacilitiesTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "4. Property Facilities"
+    AppLanguage.PIDGIN -> "4. Things Wey Dey Compound"
+  }
+
+  fun facilitiesInstruction(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Select all available facilities in the compound:"
+    AppLanguage.PIDGIN -> "Check all the things wey dey inside compound:"
+  }
+
+  fun additionalFacilitiesLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Additional Facilities Description"
+    AppLanguage.PIDGIN -> "Other Facilities Description"
+  }
+
+  fun additionalFacilitiesPlaceholder(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "e.g. Dedicated prepaid meter, borehole with treatment, night watchman"
+    AppLanguage.PIDGIN -> "e.g. Personal prepaid meter, steady water, night security"
+  }
+
+  // Submit and Dialogs
+  fun submitButtonText(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "SUBMIT PROPERTY FOR REVIEW"
+    AppLanguage.PIDGIN -> "SUBMIT HOUSE FOR REVIEW"
+  }
+
+  fun discardDialogTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Discard Listing?"
+    AppLanguage.PIDGIN -> "Cancel This Post?"
+  }
+
+  fun discardDialogMessage(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "You have unsaved changes in this property form. Do you want to discard your draft and return?"
+    AppLanguage.PIDGIN -> "You get details wey you never submit. You sure say you wan cancel and leave?"
+  }
+
+  fun discardConfirmBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Discard & Exit"
+    AppLanguage.PIDGIN -> "Cancel & Leave"
+  }
+
+  fun discardCancelBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Keep Editing"
+    AppLanguage.PIDGIN -> "Continue Form"
+  }
+
+  fun successDialogTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Submission Successful"
+    AppLanguage.PIDGIN -> "House Don Submit"
+  }
+
+  fun successDialogMessage(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Your property has been submitted successfully. Dwello Homes will review it before it appears to tenants."
+    AppLanguage.PIDGIN -> "Your property don submit successfully. Dwello Homes go check and verify am before tenants go see am."
+  }
+
+  fun successDialogPendingNote(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Approval Status: PENDING APPROVAL. Landlords cannot approve their own listings."
+    AppLanguage.PIDGIN -> "Approval Status: PENDING APPROVAL. Landlords no fit approve their own houses."
+  }
+
+  fun viewInDashboardBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "VIEW IN MY PROPERTIES"
+    AppLanguage.PIDGIN -> "CHECK FOR MY HOUSES"
+  }
 }

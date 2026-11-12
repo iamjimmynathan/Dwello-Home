@@ -44,11 +44,14 @@ data class PropertyItem(
     R.drawable.img_benin_house_modern_1794407034302,
     R.drawable.img_benin_flat_interior_1794407048683
   ),
+  val photoUris: List<String> = emptyList(),
   val facilities: List<String> = listOf("Borehole Water", "Prepaid Meter", "Fenced & Gated Compound", "POP Ceiling"),
+  val additionalFacilitiesNote: String = "",
   val rentalTerms: String = "1 Year rent in advance. 10% Caution deposit refundable at vacancy. Tenancy agreement handled via Dwello Homes.",
   val availabilityStatus: String = "Available for Inspection",
   val approvalStatus: PropertyApprovalStatus = PropertyApprovalStatus.APPROVED,
   val rejectionReason: String? = null,
+  val submissionTimestamp: Long = System.currentTimeMillis(),
   val isDemonstrationData: Boolean = true
 )
 
@@ -60,6 +63,56 @@ data class LandlordDashboardStats(
   val unavailableCount: Int,
   val newEnquiriesCount: Int
 )
+
+data class PropertyValidationResult(
+  val isValid: Boolean,
+  val titleError: String? = null,
+  val typeError: String? = null,
+  val rentError: String? = null,
+  val bedroomsError: String? = null,
+  val neighbourhoodError: String? = null,
+  val descriptionError: String? = null,
+  val photosError: String? = null
+)
+
+object PropertyFormValidator {
+  fun validate(
+    title: String,
+    propertyType: String,
+    rentAmount: Long,
+    bedrooms: Int,
+    neighbourhood: String,
+    description: String,
+    photoCount: Int
+  ): PropertyValidationResult {
+    val titleErr = if (title.trim().isEmpty()) "Title is required" else null
+    val typeErr = if (propertyType.trim().isEmpty()) "Property type is required" else null
+    val rentErr = if (rentAmount <= 0L) "Rent amount must be greater than zero" else null
+    val bedroomsErr = if (bedrooms < 1 && propertyType != "Commercial Shop") "Bedrooms must be at least 1" else null
+    val neighbourhoodErr = if (neighbourhood.trim().isEmpty()) "Neighbourhood is required" else null
+    val descErr = if (description.trim().isEmpty()) "Description is required" else null
+    val photosErr = if (photoCount < 1) "At least one photo is required" else null
+
+    val valid = titleErr == null &&
+      typeErr == null &&
+      rentErr == null &&
+      bedroomsErr == null &&
+      neighbourhoodErr == null &&
+      descErr == null &&
+      photosErr == null
+
+    return PropertyValidationResult(
+      isValid = valid,
+      titleError = titleErr,
+      typeError = typeErr,
+      rentError = rentErr,
+      bedroomsError = bedroomsErr,
+      neighbourhoodError = neighbourhoodErr,
+      descriptionError = descErr,
+      photosError = photosErr
+    )
+  }
+}
 
 data class BeninCityArea(
   val name: String,
@@ -142,6 +195,19 @@ object SamplePropertyData {
     "Duplex",
     "Detached house",
     "Shared accommodation"
+  )
+
+  val standardFacilitiesList = listOf(
+    "Water supply",
+    "Electricity",
+    "Parking space",
+    "Security",
+    "Tiled floors",
+    "Fitted kitchen",
+    "Running water",
+    "Fenced compound",
+    "Air conditioning",
+    "Other facilities"
   )
 
   // Master property repository

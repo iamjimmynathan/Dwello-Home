@@ -300,7 +300,10 @@ fun DwelloApp() {
               currentLanguage = if (currentLanguage == AppLanguage.ENGLISH) AppLanguage.PIDGIN else AppLanguage.ENGLISH
             },
             onSuccessNavigateHome = {
-              currentScreen = DwelloNavScreen.HOME
+              currentScreen = DwelloNavScreen.LANDLORD_DASHBOARD
+            },
+            onBack = {
+              currentScreen = DwelloNavScreen.LANDLORD_DASHBOARD
             }
           )
         }

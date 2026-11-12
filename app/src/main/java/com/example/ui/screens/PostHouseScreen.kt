@@ -1,5 +1,10 @@
 package com.example.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -8,6 +13,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,19 +25,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddAPhoto
-import androidx.compose.material.icons.filled.AddHome
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -38,7 +50,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -49,6 +65,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,10 +80,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.AppLanguage
 import com.example.data.DwelloStrings
+import com.example.data.PropertyApprovalStatus
 import com.example.data.PropertyItem
+import com.example.data.RentalPeriod
 import com.example.data.SamplePropertyData
 import com.example.ui.components.DwelloHeader
 import com.example.ui.theme.CardBorderSubtle
@@ -79,65 +99,96 @@ import com.example.ui.theme.SoftBlueAccent
 import com.example.ui.theme.SoftBlueBorder
 import com.example.ui.theme.VeryLightBlueBackground
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PostHouseScreen(
   currentLanguage: AppLanguage,
   onLanguageToggle: () -> Unit,
   onSuccessNavigateHome: () -> Unit,
+  onBack: (() -> Unit)? = null,
   modifier: Modifier = Modifier
 ) {
-  var houseType by remember { mutableStateOf("Self-Con") }
-  var selectedArea by remember { mutableStateOf("Uselu / Ugbowo") }
-  var streetAddress by remember { mutableStateOf("") }
-  var rentPrice by remember { mutableStateOf("250000") }
-  var landlordName by remember { mutableStateOf("") }
-  var phoneNumber by remember { mutableStateOf("") }
-  var hasWater by remember { mutableStateOf(true) }
-  var hasPrepaidMeter by remember { mutableStateOf(true) }
-  var isGated by remember { mutableStateOf(true) }
-  var selectedPhotoRes by remember { mutableIntStateOf(R.drawable.img_benin_house_exterior) }
+  val handleBack = onBack ?: onSuccessNavigateHome
 
-  var showPreviewDialog by remember { mutableStateOf(false) }
-  var showSuccessDialog by remember { mutableStateOf(false) }
-  var postedRefNumber by remember { mutableStateOf("") }
+  // Form State
+  var propertyTitle by remember { mutableStateOf("") }
+  var selectedPropertyType by remember { mutableStateOf(SamplePropertyData.propertyTypesList.first()) }
+  var bedroomsCount by remember { mutableIntStateOf(1) }
+  var bathroomsCount by remember { mutableIntStateOf(1) }
+  var rentAmountString by remember { mutableStateOf("") }
+  var rentalPeriod by remember { mutableStateOf(RentalPeriod.YEARLY) }
+  var propertyDescription by remember { mutableStateOf("") }
 
-  val houseTypes = listOf("Self-Con", "2-Bedroom Flat", "3-Bedroom Flat", "Single Room", "Commercial Shop")
+  // Location State
+  var selectedNeighbourhood by remember { mutableStateOf("") }
+  var addressOrLandmark by remember { mutableStateOf("") }
 
-  val previewProperty = remember(houseType, selectedArea, streetAddress, rentPrice, landlordName, phoneNumber, hasWater, hasPrepaidMeter, isGated, selectedPhotoRes) {
-    val cleanPrice = rentPrice.filter { it.isDigit() }.toLongOrNull() ?: 250000L
-    PropertyItem(
-      id = "user_prop_${System.currentTimeMillis()}",
-      titleEn = "$houseType Apartment",
-      titlePidgin = "$houseType House",
-      categoryEn = houseType,
-      categoryPidgin = houseType,
-      area = selectedArea,
-      priceNaira = cleanPrice,
-      priceFormatted = "₦${String.format("%,d", cleanPrice)}",
-      bedrooms = if (houseType.contains("2")) 2 else if (houseType.contains("3")) 3 else 1,
-      bathrooms = 1,
-      isGated = isGated,
-      hasBorehole = hasWater,
-      hasPrepaidMeter = hasPrepaidMeter,
-      landlordName = landlordName.ifBlank { "Property Owner" },
-      landlordRoleEn = "Landlord (Property Owner)",
-      landlordRolePidgin = "House Owner",
-      phoneContact = phoneNumber.ifBlank { "0803 000 0000" },
-      descriptionEn = "Quality $houseType in $selectedArea, Benin City. ${if (streetAddress.isNotBlank()) "Location: $streetAddress. " else ""}Features borehole running water, prepaid meter, and secure compound.",
-      descriptionPidgin = "Clean $houseType for $selectedArea, Benin City. ${if (streetAddress.isNotBlank()) "Address: $streetAddress. " else ""}Water and prepaid light dey.",
-      neighborhoodNote = streetAddress.ifBlank { "Benin City Residential Axis" },
-      imageResId = selectedPhotoRes,
-      imageResList = listOf(selectedPhotoRes, R.drawable.img_benin_house_interior),
-      facilities = listOf(
-        if (hasWater) "Borehole Water" else "Water Container",
-        if (hasPrepaidMeter) "Prepaid Meter" else "Shared Meter",
-        if (isGated) "Gated Compound" else "Open Compound",
-        "Tiled Floor"
-      ),
-      rentalTerms = "1 Year advance rent. Inspection and tenant coordination managed via Dwello Homes.",
-      approvalStatus = com.example.data.PropertyApprovalStatus.PENDING_APPROVAL,
-      isDemonstrationData = false
+  // Facilities State
+  val selectedFacilities = remember {
+    mutableStateListOf(
+      "Water supply",
+      "Electricity",
+      "Security"
     )
+  }
+  var additionalFacilitiesText by remember { mutableStateOf("") }
+
+  // Photos State (Multiple photo URIs from Android Photo Picker)
+  val selectedPhotoUris = remember { mutableStateListOf<String>() }
+
+  // Validation Error States
+  var titleError by remember { mutableStateOf<String?>(null) }
+  var typeError by remember { mutableStateOf<String?>(null) }
+  var rentError by remember { mutableStateOf<String?>(null) }
+  var bedroomsError by remember { mutableStateOf<String?>(null) }
+  var neighbourhoodError by remember { mutableStateOf<String?>(null) }
+  var descriptionError by remember { mutableStateOf<String?>(null) }
+  var photosError by remember { mutableStateOf<String?>(null) }
+
+  // Dialog States
+  var showDiscardDialog by remember { mutableStateOf(false) }
+  var showSuccessDialog by remember { mutableStateOf(false) }
+  var generatedRefNumber by remember { mutableStateOf("") }
+
+  // Determine if form has dirty uncommitted data
+  val isFormDirty = remember(
+    propertyTitle,
+    rentAmountString,
+    propertyDescription,
+    selectedNeighbourhood,
+    addressOrLandmark,
+    selectedPhotoUris.size
+  ) {
+    propertyTitle.isNotBlank() ||
+      rentAmountString.isNotBlank() ||
+      propertyDescription.isNotBlank() ||
+      selectedNeighbourhood.isNotBlank() ||
+      addressOrLandmark.isNotBlank() ||
+      selectedPhotoUris.isNotEmpty()
+  }
+
+  // Intercept back navigation
+  BackHandler {
+    if (isFormDirty) {
+      showDiscardDialog = true
+    } else {
+      handleBack()
+    }
+  }
+
+  // Android Photo Picker Launcher (Zero-permission Android 13+ standard Photo Picker)
+  val photoPickerLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
+  ) { uris: List<Uri> ->
+    if (uris.isNotEmpty()) {
+      val newUriStrings = uris.map { it.toString() }
+      newUriStrings.forEach { uriStr ->
+        if (!selectedPhotoUris.contains(uriStr)) {
+          selectedPhotoUris.add(uriStr)
+        }
+      }
+      photosError = null
+    }
   }
 
   Column(
@@ -145,7 +196,7 @@ fun PostHouseScreen(
       .fillMaxSize()
       .background(MainBackgroundWhite)
   ) {
-    // Header
+    // 1. Header with Language Switch
     DwelloHeader(
       currentLanguage = currentLanguage,
       onLanguageToggle = onLanguageToggle
@@ -155,10 +206,51 @@ fun PostHouseScreen(
       modifier = Modifier
         .fillMaxSize()
         .testTag("post_house_form_scroll"),
-      contentPadding = PaddingValues(horizontal = 20.dp, vertical = 18.dp)
+      contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)
     ) {
-      // Step Heading
+      // 2. Navigation Top Bar with Back Button
       item {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          IconButton(
+            onClick = {
+              if (isFormDirty) {
+                showDiscardDialog = true
+              } else {
+                handleBack()
+              }
+            },
+            modifier = Modifier.testTag("post_house_back_button")
+          ) {
+            Icon(
+              imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+              contentDescription = "Back",
+              tint = SkyBluePrimary
+            )
+          }
+
+          Spacer(modifier = Modifier.width(4.dp))
+
+          Column {
+            Text(
+              text = DwelloStrings.postHouseFormTitle(currentLanguage),
+              style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.ExtraBold,
+                color = DeepNavyText
+              )
+            )
+            Text(
+              text = "Dwello Homes • Benin City, Edo State",
+              style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+            )
+          }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Instructional Banner for High Accessibility
         Card(
           modifier = Modifier.fillMaxWidth(),
           shape = RoundedCornerShape(14.dp),
@@ -166,7 +258,7 @@ fun PostHouseScreen(
           border = BorderStroke(1.dp, SoftBlueBorder)
         ) {
           Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
           ) {
             Box(
@@ -177,620 +269,1126 @@ fun PostHouseScreen(
               contentAlignment = Alignment.Center
             ) {
               Icon(
-                imageVector = Icons.Default.AddHome,
+                imageVector = Icons.Default.Info,
                 contentDescription = null,
                 tint = Color.White,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(22.dp)
               )
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column {
               Text(
-                text = DwelloStrings.postHouseHeader(currentLanguage),
-                style = MaterialTheme.typography.titleMedium.copy(
-                  fontWeight = FontWeight.Bold,
-                  color = DeepNavyText
-                )
-              )
-              Text(
                 text = DwelloStrings.postHouseInstruction(currentLanguage),
                 style = MaterialTheme.typography.bodySmall.copy(
-                  color = NavyTextSecondary
+                  color = DeepNavyText,
+                  fontWeight = FontWeight.Medium,
+                  lineHeight = 18.sp
                 )
               )
             }
           }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(20.dp))
       }
 
-      // Step 1: House Type
+      // ==========================================
+      // SECTION 1: PROPERTY PHOTOS
+      // ==========================================
       item {
         Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "1. Select House Type" else "1. Choose Type of House",
-          style = MaterialTheme.typography.titleSmall.copy(
+          text = DwelloStrings.sectionPhotosTitle(currentLanguage),
+          style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
+          )
+        )
+        Text(
+          text = DwelloStrings.photosInstruction(currentLanguage),
+          style = MaterialTheme.typography.bodySmall.copy(
+            color = NavyTextSecondary,
+            lineHeight = 18.sp
+          )
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Big Select Photos Button
+        Button(
+          onClick = {
+            photoPickerLauncher.launch(
+              PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+            )
+          },
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp)
+            .testTag("select_photos_button"),
+          shape = RoundedCornerShape(12.dp),
+          colors = ButtonDefaults.buttonColors(
+            containerColor = SoftBlueAccent,
+            contentColor = SkyBluePrimary
+          ),
+          border = BorderStroke(1.5.dp, SkyBluePrimary)
+        ) {
+          Icon(
+            imageVector = Icons.Default.AddPhotoAlternate,
+            contentDescription = null,
+            tint = SkyBluePrimary,
+            modifier = Modifier.size(24.dp)
+          )
+          Spacer(modifier = Modifier.width(10.dp))
+          Text(
+            text = DwelloStrings.selectPhotosBtn(currentLanguage),
+            style = MaterialTheme.typography.titleSmall.copy(
+              fontWeight = FontWeight.Bold,
+              color = SkyBluePrimary
+            )
+          )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Selected Photos Horizontal Carousel Preview
+        if (selectedPhotoUris.isNotEmpty()) {
+          Text(
+            text = DwelloStrings.selectedPhotosCount(currentLanguage, selectedPhotoUris.size),
+            style = MaterialTheme.typography.labelMedium.copy(
+              fontWeight = FontWeight.Bold,
+              color = DeepNavyText
+            )
+          )
+          Spacer(modifier = Modifier.height(8.dp))
+
+          LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(vertical = 4.dp)
+          ) {
+            items(selectedPhotoUris) { uriString ->
+              Box(
+                modifier = Modifier
+                  .size(110.dp)
+                  .clip(RoundedCornerShape(12.dp))
+                  .border(1.dp, SoftBlueBorder, RoundedCornerShape(12.dp))
+              ) {
+                AsyncImage(
+                  model = Uri.parse(uriString),
+                  contentDescription = "Selected Property Photo",
+                  modifier = Modifier.fillMaxSize(),
+                  contentScale = ContentScale.Crop
+                )
+
+                // Remove Photo Button
+                Surface(
+                  modifier = Modifier
+                    .padding(6.dp)
+                    .size(26.dp)
+                    .align(Alignment.TopEnd)
+                    .clip(CircleShape)
+                    .clickable { selectedPhotoUris.remove(uriString) }
+                    .testTag("remove_photo_btn"),
+                  color = Color.Black.copy(alpha = 0.75f)
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Remove photo",
+                    tint = Color.White,
+                    modifier = Modifier
+                      .padding(4.dp)
+                      .size(16.dp)
+                  )
+                }
+              }
+            }
+          }
+        } else {
+          // No photos message
+          Surface(
+            color = Color(0xFFF8FAFC),
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Row(
+              modifier = Modifier.padding(12.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = NavyTextSecondary,
+                modifier = Modifier.size(18.dp)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Text(
+                text = DwelloStrings.noPhotosSelected(currentLanguage),
+                style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+              )
+            }
+          }
+        }
+
+        // Inline Photo Error
+        photosError?.let { err ->
+          Spacer(modifier = Modifier.height(6.dp))
+          Text(
+            text = err,
+            style = MaterialTheme.typography.labelSmall.copy(
+              color = MaterialTheme.colorScheme.error,
+              fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier.testTag("photos_error_text")
+          )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+          text = DwelloStrings.localPhotoNotice(currentLanguage),
+          style = MaterialTheme.typography.labelSmall.copy(
+            color = NavyTextSecondary,
+            fontSize = 11.sp
+          )
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+      }
+
+      // ==========================================
+      // SECTION 2: PROPERTY DETAILS
+      // ==========================================
+      item {
+        Text(
+          text = DwelloStrings.sectionDetailsTitle(currentLanguage),
+          style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
+          )
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Property Title
+        Text(
+          text = DwelloStrings.titleLabel(currentLanguage),
+          style = MaterialTheme.typography.labelMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
+          )
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        OutlinedTextField(
+          value = propertyTitle,
+          onValueChange = {
+            propertyTitle = it
+            if (it.isNotBlank()) titleError = null
+          },
+          placeholder = { Text(DwelloStrings.titlePlaceholder(currentLanguage)) },
+          isError = titleError != null,
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("property_title_input"),
+          singleLine = true,
+          shape = RoundedCornerShape(12.dp),
+          colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = VeryLightBlueBackground,
+            unfocusedContainerColor = VeryLightBlueBackground,
+            focusedBorderColor = SkyBluePrimary,
+            unfocusedBorderColor = SoftBlueBorder,
+            focusedTextColor = DeepNavyText,
+            unfocusedTextColor = DeepNavyText
+          )
+        )
+        titleError?.let { err ->
+          Text(
+            text = err,
+            style = MaterialTheme.typography.labelSmall.copy(
+              color = MaterialTheme.colorScheme.error,
+              fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier
+              .padding(top = 4.dp)
+              .testTag("title_error_text")
+          )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Property Type Chips
+        Text(
+          text = DwelloStrings.selectTypeLabel(currentLanguage),
+          style = MaterialTheme.typography.labelMedium.copy(
             fontWeight = FontWeight.Bold,
             color = DeepNavyText
           )
         )
         Spacer(modifier = Modifier.height(8.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          houseTypes.chunked(2).forEach { rowItems ->
+        FlowRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          SamplePropertyData.propertyTypesList.forEach { pType ->
+            val isSelected = selectedPropertyType == pType
+            FilterChip(
+              selected = isSelected,
+              onClick = {
+                selectedPropertyType = pType
+                typeError = null
+              },
+              label = {
+                Text(
+                  text = pType,
+                  style = MaterialTheme.typography.bodySmall.copy(
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                  )
+                )
+              },
+              shape = RoundedCornerShape(10.dp),
+              colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = SkyBluePrimary,
+                selectedLabelColor = Color.White,
+                containerColor = Color.White,
+                labelColor = DeepNavyText
+              ),
+              border = FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = isSelected,
+                borderColor = SoftBlueBorder,
+                selectedBorderColor = SkyBluePrimary,
+                borderWidth = 1.dp
+              ),
+              modifier = Modifier.testTag("property_type_chip_$pType")
+            )
+          }
+        }
+        typeError?.let { err ->
+          Text(
+            text = err,
+            style = MaterialTheme.typography.labelSmall.copy(
+              color = MaterialTheme.colorScheme.error,
+              fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier.padding(top = 4.dp)
+          )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Steppers for Bedrooms and Bathrooms
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+          // Bedrooms
+          Column(modifier = Modifier.weight(1f)) {
+            Text(
+              text = DwelloStrings.bedroomsCountLabel(currentLanguage),
+              style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = DeepNavyText
+              )
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .background(VeryLightBlueBackground, RoundedCornerShape(12.dp))
+                .border(1.dp, SoftBlueBorder, RoundedCornerShape(12.dp))
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+              IconButton(
+                onClick = {
+                  if (bedroomsCount > 1) {
+                    bedroomsCount--
+                    bedroomsError = null
+                  }
+                },
+                modifier = Modifier.size(36.dp)
+              ) {
+                Icon(Icons.Default.Remove, contentDescription = "Decrease Bedrooms", tint = SkyBluePrimary)
+              }
+              Text(
+                text = "$bedroomsCount",
+                style = MaterialTheme.typography.titleMedium.copy(
+                  fontWeight = FontWeight.Bold,
+                  color = DeepNavyText
+                )
+              )
+              IconButton(
+                onClick = {
+                  bedroomsCount++
+                  bedroomsError = null
+                },
+                modifier = Modifier.size(36.dp)
+              ) {
+                Icon(Icons.Default.Add, contentDescription = "Increase Bedrooms", tint = SkyBluePrimary)
+              }
+            }
+          }
+
+          // Bathrooms
+          Column(modifier = Modifier.weight(1f)) {
+            Text(
+              text = DwelloStrings.bathroomsCountLabel(currentLanguage),
+              style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = DeepNavyText
+              )
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .background(VeryLightBlueBackground, RoundedCornerShape(12.dp))
+                .border(1.dp, SoftBlueBorder, RoundedCornerShape(12.dp))
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+              IconButton(
+                onClick = { if (bathroomsCount > 1) bathroomsCount-- },
+                modifier = Modifier.size(36.dp)
+              ) {
+                Icon(Icons.Default.Remove, contentDescription = "Decrease Bathrooms", tint = SkyBluePrimary)
+              }
+              Text(
+                text = "$bathroomsCount",
+                style = MaterialTheme.typography.titleMedium.copy(
+                  fontWeight = FontWeight.Bold,
+                  color = DeepNavyText
+                )
+              )
+              IconButton(
+                onClick = { bathroomsCount++ },
+                modifier = Modifier.size(36.dp)
+              ) {
+                Icon(Icons.Default.Add, contentDescription = "Increase Bathrooms", tint = SkyBluePrimary)
+              }
+            }
+          }
+        }
+
+        bedroomsError?.let { err ->
+          Text(
+            text = err,
+            style = MaterialTheme.typography.labelSmall.copy(
+              color = MaterialTheme.colorScheme.error,
+              fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier.padding(top = 4.dp)
+          )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Rent Amount and Payment Period
+        Text(
+          text = DwelloStrings.rentAmountLabel(currentLanguage),
+          style = MaterialTheme.typography.labelMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
+          )
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        OutlinedTextField(
+          value = rentAmountString,
+          onValueChange = {
+            rentAmountString = it.filter { ch -> ch.isDigit() }
+            val amount = rentAmountString.toLongOrNull() ?: 0L
+            if (amount > 0L) rentError = null
+          },
+          placeholder = { Text(DwelloStrings.rentAmountPlaceholder(currentLanguage)) },
+          isError = rentError != null,
+          prefix = {
+            Text("₦ ", fontWeight = FontWeight.ExtraBold, color = SkyBluePrimary)
+          },
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("rent_amount_input"),
+          singleLine = true,
+          shape = RoundedCornerShape(12.dp),
+          colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = VeryLightBlueBackground,
+            unfocusedContainerColor = VeryLightBlueBackground,
+            focusedBorderColor = SkyBluePrimary,
+            unfocusedBorderColor = SoftBlueBorder,
+            focusedTextColor = DeepNavyText,
+            unfocusedTextColor = DeepNavyText
+          )
+        )
+        rentError?.let { err ->
+          Text(
+            text = err,
+            style = MaterialTheme.typography.labelSmall.copy(
+              color = MaterialTheme.colorScheme.error,
+              fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier
+              .padding(top = 4.dp)
+              .testTag("rent_error_text")
+          )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Preferred Payment Period Segmented Options
+        Text(
+          text = DwelloStrings.paymentPeriodLabel(currentLanguage),
+          style = MaterialTheme.typography.labelMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
+          )
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+          // Yearly
+          val isYearly = rentalPeriod == RentalPeriod.YEARLY
+          Surface(
+            modifier = Modifier
+              .weight(1f)
+              .clip(RoundedCornerShape(10.dp))
+              .clickable { rentalPeriod = RentalPeriod.YEARLY }
+              .testTag("period_yearly_btn"),
+            color = if (isYearly) SkyBluePrimary else Color.White,
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, if (isYearly) SkyBluePrimary else SoftBlueBorder)
+          ) {
+            Row(
+              modifier = Modifier.padding(vertical = 12.dp),
+              horizontalArrangement = Arrangement.Center,
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              if (isYearly) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+              }
+              Text(
+                text = DwelloStrings.periodYearlyOption(currentLanguage),
+                style = MaterialTheme.typography.labelMedium.copy(
+                  fontWeight = FontWeight.Bold,
+                  color = if (isYearly) Color.White else DeepNavyText
+                )
+              )
+            }
+          }
+
+          // Monthly
+          val isMonthly = rentalPeriod == RentalPeriod.MONTHLY
+          Surface(
+            modifier = Modifier
+              .weight(1f)
+              .clip(RoundedCornerShape(10.dp))
+              .clickable { rentalPeriod = RentalPeriod.MONTHLY }
+              .testTag("period_monthly_btn"),
+            color = if (isMonthly) SkyBluePrimary else Color.White,
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, if (isMonthly) SkyBluePrimary else SoftBlueBorder)
+          ) {
+            Row(
+              modifier = Modifier.padding(vertical = 12.dp),
+              horizontalArrangement = Arrangement.Center,
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              if (isMonthly) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+              }
+              Text(
+                text = DwelloStrings.periodMonthlyOption(currentLanguage),
+                style = MaterialTheme.typography.labelMedium.copy(
+                  fontWeight = FontWeight.Bold,
+                  color = if (isMonthly) Color.White else DeepNavyText
+                )
+              )
+            }
+          }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Property Description
+        Text(
+          text = DwelloStrings.descriptionLabel(currentLanguage),
+          style = MaterialTheme.typography.labelMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
+          )
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        OutlinedTextField(
+          value = propertyDescription,
+          onValueChange = {
+            propertyDescription = it
+            if (it.isNotBlank()) descriptionError = null
+          },
+          placeholder = { Text(DwelloStrings.descriptionPlaceholder(currentLanguage)) },
+          isError = descriptionError != null,
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp)
+            .testTag("property_description_input"),
+          maxLines = 5,
+          shape = RoundedCornerShape(12.dp),
+          colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = VeryLightBlueBackground,
+            unfocusedContainerColor = VeryLightBlueBackground,
+            focusedBorderColor = SkyBluePrimary,
+            unfocusedBorderColor = SoftBlueBorder,
+            focusedTextColor = DeepNavyText,
+            unfocusedTextColor = DeepNavyText
+          )
+        )
+        descriptionError?.let { err ->
+          Text(
+            text = err,
+            style = MaterialTheme.typography.labelSmall.copy(
+              color = MaterialTheme.colorScheme.error,
+              fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier
+              .padding(top = 4.dp)
+              .testTag("description_error_text")
+          )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+      }
+
+      // ==========================================
+      // SECTION 3: PROPERTY LOCATION (BENIN CITY)
+      // ==========================================
+      item {
+        Text(
+          text = DwelloStrings.sectionLocationTitle(currentLanguage),
+          style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
+          )
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+          text = DwelloStrings.neighbourhoodLabel(currentLanguage),
+          style = MaterialTheme.typography.labelMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
+          )
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Benin City Neighbourhood Chips
+        FlowRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          SamplePropertyData.beninAreas.forEach { areaItem ->
+            val isSelected = selectedNeighbourhood == areaItem.name
+            Surface(
+              modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .clickable {
+                  selectedNeighbourhood = areaItem.name
+                  neighbourhoodError = null
+                }
+                .testTag("neighbourhood_chip_${areaItem.name}"),
+              color = if (isSelected) SkyBluePrimary else Color.White,
+              shape = RoundedCornerShape(10.dp),
+              border = BorderStroke(1.dp, if (isSelected) SkyBluePrimary else SoftBlueBorder)
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Icon(
+                  imageVector = Icons.Default.LocationOn,
+                  contentDescription = null,
+                  tint = if (isSelected) Color.White else SkyBluePrimary,
+                  modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                  text = areaItem.name,
+                  style = MaterialTheme.typography.bodySmall.copy(
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) Color.White else DeepNavyText
+                  )
+                )
+              }
+            }
+          }
+        }
+        neighbourhoodError?.let { err ->
+          Text(
+            text = err,
+            style = MaterialTheme.typography.labelSmall.copy(
+              color = MaterialTheme.colorScheme.error,
+              fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier
+              .padding(top = 4.dp)
+              .testTag("neighbourhood_error_text")
+          )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Full Address or Landmark
+        Text(
+          text = DwelloStrings.addressLabel(currentLanguage),
+          style = MaterialTheme.typography.labelMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
+          )
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        OutlinedTextField(
+          value = addressOrLandmark,
+          onValueChange = { addressOrLandmark = it },
+          placeholder = { Text(DwelloStrings.addressPlaceholder(currentLanguage)) },
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("address_or_landmark_input"),
+          singleLine = true,
+          shape = RoundedCornerShape(12.dp),
+          colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = VeryLightBlueBackground,
+            unfocusedContainerColor = VeryLightBlueBackground,
+            focusedBorderColor = SkyBluePrimary,
+            unfocusedBorderColor = SoftBlueBorder,
+            focusedTextColor = DeepNavyText,
+            unfocusedTextColor = DeepNavyText
+          )
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+          text = DwelloStrings.locationNotice(currentLanguage),
+          style = MaterialTheme.typography.labelSmall.copy(
+            color = NavyTextSecondary,
+            fontSize = 11.sp
+          )
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+      }
+
+      // ==========================================
+      // SECTION 4: PROPERTY FACILITIES
+      // ==========================================
+      item {
+        Text(
+          text = DwelloStrings.sectionFacilitiesTitle(currentLanguage),
+          style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText
+          )
+        )
+        Text(
+          text = DwelloStrings.facilitiesInstruction(currentLanguage),
+          style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Facilities Checkbox List in very light blue background
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .background(VeryLightBlueBackground, RoundedCornerShape(14.dp))
+            .border(1.dp, SoftBlueBorder, RoundedCornerShape(14.dp))
+            .padding(10.dp)
+        ) {
+          SamplePropertyData.standardFacilitiesList.chunked(2).forEach { pair ->
             Row(
               modifier = Modifier.fillMaxWidth(),
               horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-              rowItems.forEach { type ->
-                val isSelected = houseType == type
-                Surface(
+              pair.forEach { facility ->
+                val isChecked = selectedFacilities.contains(facility)
+                Row(
                   modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { houseType = type }
-                    .testTag("house_type_chip_$type"),
-                  color = if (isSelected) SkyBluePrimary else Color.White,
-                  shape = RoundedCornerShape(12.dp),
-                  border = BorderStroke(1.dp, if (isSelected) SkyBluePrimary else SoftBlueBorder)
-                ) {
-                  Row(
-                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                  ) {
-                    if (isSelected) {
-                      Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
-                      )
-                      Spacer(modifier = Modifier.width(4.dp))
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                      if (isChecked) {
+                        selectedFacilities.remove(facility)
+                      } else {
+                        selectedFacilities.add(facility)
+                      }
                     }
-                    Text(
-                      text = type,
-                      style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.White else DeepNavyText
-                      )
+                    .padding(vertical = 4.dp),
+                  verticalAlignment = Alignment.CenterVertically
+                ) {
+                  Checkbox(
+                    checked = isChecked,
+                    onCheckedChange = { checked ->
+                      if (checked) selectedFacilities.add(facility) else selectedFacilities.remove(facility)
+                    },
+                    colors = CheckboxDefaults.colors(checkedColor = SkyBluePrimary),
+                    modifier = Modifier.size(36.dp)
+                  )
+                  Spacer(modifier = Modifier.width(4.dp))
+                  Text(
+                    text = facility,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                      fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Medium,
+                      color = DeepNavyText
                     )
-                  }
+                  )
                 }
               }
-              if (rowItems.size == 1) {
+              if (pair.size == 1) {
                 Spacer(modifier = Modifier.weight(1f))
               }
             }
           }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
-      }
+        Spacer(modifier = Modifier.height(14.dp))
 
-      // Step 2: Property Photographs
-      item {
+        // Additional Facilities Description
         Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "2. Property Photograph" else "2. House Picture",
-          style = MaterialTheme.typography.titleSmall.copy(
+          text = DwelloStrings.additionalFacilitiesLabel(currentLanguage),
+          style = MaterialTheme.typography.labelMedium.copy(
             fontWeight = FontWeight.Bold,
             color = DeepNavyText
           )
         )
-        Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "Select property photo representation:" else "Choose picture for the house:",
-          style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+        Spacer(modifier = Modifier.height(6.dp))
+        OutlinedTextField(
+          value = additionalFacilitiesText,
+          onValueChange = { additionalFacilitiesText = it },
+          placeholder = { Text(DwelloStrings.additionalFacilitiesPlaceholder(currentLanguage)) },
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(90.dp)
+            .testTag("additional_facilities_input"),
+          maxLines = 3,
+          shape = RoundedCornerShape(12.dp),
+          colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = VeryLightBlueBackground,
+            unfocusedContainerColor = VeryLightBlueBackground,
+            focusedBorderColor = SkyBluePrimary,
+            unfocusedBorderColor = SoftBlueBorder,
+            focusedTextColor = DeepNavyText,
+            unfocusedTextColor = DeepNavyText
+          )
         )
-        Spacer(modifier = Modifier.height(8.dp))
 
-        Row(
+        Spacer(modifier = Modifier.height(20.dp))
+      }
+
+      // ==========================================
+      // SECTION 5: PRIVACY & SUBMIT BUTTON
+      // ==========================================
+      item {
+        Card(
           modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-          // Photo Option 1: Exterior
-          val isExt = selectedPhotoRes == R.drawable.img_benin_house_exterior
-          Card(
-            modifier = Modifier
-              .weight(1f)
-              .clip(RoundedCornerShape(12.dp))
-              .clickable { selectedPhotoRes = R.drawable.img_benin_house_exterior },
-            border = BorderStroke(2.dp, if (isExt) SkyBluePrimary else SoftBlueBorder)
-          ) {
-            Column {
-              Image(
-                painter = painterResource(id = R.drawable.img_benin_house_exterior),
-                contentDescription = "Compound Exterior",
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .height(85.dp),
-                contentScale = ContentScale.Crop
-              )
-              Text(
-                text = "Compound Exterior",
-                modifier = Modifier.padding(6.dp),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = if (isExt) FontWeight.Bold else FontWeight.Normal,
-                  color = if (isExt) SkyBluePrimary else DeepNavyText
-                )
-              )
-            }
-          }
-
-          // Photo Option 2: Interior
-          val isInt = selectedPhotoRes == R.drawable.img_benin_house_interior
-          Card(
-            modifier = Modifier
-              .weight(1f)
-              .clip(RoundedCornerShape(12.dp))
-              .clickable { selectedPhotoRes = R.drawable.img_benin_house_interior },
-            border = BorderStroke(2.dp, if (isInt) SkyBluePrimary else SoftBlueBorder)
-          ) {
-            Column {
-              Image(
-                painter = painterResource(id = R.drawable.img_benin_house_interior),
-                contentDescription = "Apartment Interior",
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .height(85.dp),
-                contentScale = ContentScale.Crop
-              )
-              Text(
-                text = "Living Room Interior",
-                modifier = Modifier.padding(6.dp),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = if (isInt) FontWeight.Bold else FontWeight.Normal,
-                  color = if (isInt) SkyBluePrimary else DeepNavyText
-                )
-              )
-            }
-          }
-        }
-
-        Spacer(modifier = Modifier.height(18.dp))
-      }
-
-      // Step 3: Location in Benin City
-      item {
-        Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "3. Location in Benin City" else "3. Area wey the house dey for Benin",
-          style = MaterialTheme.typography.titleSmall.copy(
-            fontWeight = FontWeight.Bold,
-            color = DeepNavyText
-          )
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Area selection buttons
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-          SamplePropertyData.beninAreas.take(6).chunked(2).forEach { rowAreas ->
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-              rowAreas.forEach { area ->
-                val isSelected = selectedArea == area.name
-                Surface(
-                  modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { selectedArea = area.name },
-                  color = if (isSelected) SoftBlueAccent else Color.White,
-                  shape = RoundedCornerShape(10.dp),
-                  border = BorderStroke(1.dp, if (isSelected) SkyBluePrimary else SoftBlueBorder)
-                ) {
-                  Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                  ) {
-                    Icon(
-                      imageVector = Icons.Default.LocationOn,
-                      contentDescription = null,
-                      tint = if (isSelected) SkyBluePrimary else NavyTextSecondary,
-                      modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                      text = area.name,
-                      style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = DeepNavyText
-                      )
-                    )
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedTextField(
-          value = streetAddress,
-          onValueChange = { streetAddress = it },
-          label = { Text(if (currentLanguage == AppLanguage.ENGLISH) "Street name or landmark" else "Street name or nearest bus stop") },
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("street_address_input"),
-          singleLine = true,
           shape = RoundedCornerShape(12.dp),
-          colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = VeryLightBlueBackground,
-            unfocusedContainerColor = VeryLightBlueBackground,
-            focusedBorderColor = SkyBluePrimary,
-            unfocusedBorderColor = SoftBlueBorder,
-            focusedTextColor = DeepNavyText,
-            unfocusedTextColor = DeepNavyText
-          )
-        )
-
-        Spacer(modifier = Modifier.height(18.dp))
-      }
-
-      // Step 4: Rent Price
-      item {
-        Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "4. Yearly Rent (₦)" else "4. House Rent per year (₦)",
-          style = MaterialTheme.typography.titleSmall.copy(
-            fontWeight = FontWeight.Bold,
-            color = DeepNavyText
-          )
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedTextField(
-          value = rentPrice,
-          onValueChange = { rentPrice = it },
-          label = { Text("e.g. 250000") },
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("rent_price_input"),
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-          singleLine = true,
-          prefix = { Text("₦ ", fontWeight = FontWeight.Bold, color = SkyBluePrimary) },
-          shape = RoundedCornerShape(12.dp),
-          colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = VeryLightBlueBackground,
-            unfocusedContainerColor = VeryLightBlueBackground,
-            focusedBorderColor = SkyBluePrimary,
-            unfocusedBorderColor = SoftBlueBorder,
-            focusedTextColor = DeepNavyText,
-            unfocusedTextColor = DeepNavyText
-          )
-        )
-
-        Spacer(modifier = Modifier.height(18.dp))
-      }
-
-      // Step 5: Amenities
-      item {
-        Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "5. Amenities in Compound" else "5. Things wey dey the compound",
-          style = MaterialTheme.typography.titleSmall.copy(
-            fontWeight = FontWeight.Bold,
-            color = DeepNavyText
-          )
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Column(
-          modifier = Modifier
-            .fillMaxWidth()
-            .background(VeryLightBlueBackground, RoundedCornerShape(12.dp))
-            .border(1.dp, SoftBlueBorder, RoundedCornerShape(12.dp))
-            .padding(8.dp)
+          colors = CardDefaults.cardColors(containerColor = SoftBlueAccent),
+          border = BorderStroke(1.dp, SoftBlueBorder)
         ) {
           Row(
-            modifier = Modifier
-              .fillMaxWidth()
-              .clickable { hasWater = !hasWater }
-              .padding(vertical = 4.dp),
+            modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
           ) {
-            Checkbox(
-              checked = hasWater,
-              onCheckedChange = { hasWater = it },
-              colors = CheckboxDefaults.colors(checkedColor = SkyBluePrimary)
+            Icon(
+              imageVector = Icons.Default.Security,
+              contentDescription = null,
+              tint = SkyBluePrimary,
+              modifier = Modifier.size(24.dp)
             )
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
-              text = if (currentLanguage == AppLanguage.ENGLISH) "Running Water (Borehole)" else "Borehole Water / Running Tap",
-              style = MaterialTheme.typography.bodyMedium,
-              color = DeepNavyText
-            )
-          }
-
-          Row(
-            modifier = Modifier
-              .fillMaxWidth()
-              .clickable { hasPrepaidMeter = !hasPrepaidMeter }
-              .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            Checkbox(
-              checked = hasPrepaidMeter,
-              onCheckedChange = { hasPrepaidMeter = it },
-              colors = CheckboxDefaults.colors(checkedColor = SkyBluePrimary)
-            )
-            Text(
-              text = if (currentLanguage == AppLanguage.ENGLISH) "Prepaid Meter (Light)" else "Prepaid Meter (Nepa Light)",
-              style = MaterialTheme.typography.bodyMedium,
-              color = DeepNavyText
-            )
-          }
-
-          Row(
-            modifier = Modifier
-              .fillMaxWidth()
-              .clickable { isGated = !isGated }
-              .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            Checkbox(
-              checked = isGated,
-              onCheckedChange = { isGated = it },
-              colors = CheckboxDefaults.colors(checkedColor = SkyBluePrimary)
-            )
-            Text(
-              text = if (currentLanguage == AppLanguage.ENGLISH) "Fenced & Gated Compound" else "Fenced Compound with Gate",
-              style = MaterialTheme.typography.bodyMedium,
-              color = DeepNavyText
+              text = DwelloStrings.privatePhoneProtectedNotice(currentLanguage),
+              style = MaterialTheme.typography.bodySmall.copy(
+                color = DeepNavyText,
+                lineHeight = 18.sp,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+              )
             )
           }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
-      }
+        Spacer(modifier = Modifier.height(20.dp))
 
-      // Step 6: Contact Information
-      item {
-        Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "6. Landlord Phone Number" else "6. Phone number to receive calls",
-          style = MaterialTheme.typography.titleSmall.copy(
-            fontWeight = FontWeight.Bold,
-            color = DeepNavyText
-          )
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+        // Large Primary Submit Button
+        Button(
+          onClick = {
+            // Validate all fields
+            var hasErrors = false
 
-        OutlinedTextField(
-          value = landlordName,
-          onValueChange = { landlordName = it },
-          label = { Text("Your Name") },
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("landlord_name_input"),
-          singleLine = true,
-          shape = RoundedCornerShape(12.dp),
-          colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = VeryLightBlueBackground,
-            unfocusedContainerColor = VeryLightBlueBackground,
-            focusedBorderColor = SkyBluePrimary,
-            unfocusedBorderColor = SoftBlueBorder,
-            focusedTextColor = DeepNavyText,
-            unfocusedTextColor = DeepNavyText
-          )
-        )
+            if (propertyTitle.trim().isEmpty()) {
+              titleError = DwelloStrings.errorTitleRequired(currentLanguage)
+              hasErrors = true
+            } else {
+              titleError = null
+            }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            if (selectedPropertyType.isEmpty()) {
+              typeError = DwelloStrings.errorTypeRequired(currentLanguage)
+              hasErrors = true
+            } else {
+              typeError = null
+            }
 
-        OutlinedTextField(
-          value = phoneNumber,
-          onValueChange = { phoneNumber = it },
-          label = { Text("Phone Number (e.g. 080...)") },
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("phone_number_input"),
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-          leadingIcon = {
-            Icon(imageVector = Icons.Default.Phone, contentDescription = null, tint = SkyBluePrimary)
-          },
-          singleLine = true,
-          shape = RoundedCornerShape(12.dp),
-          colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = VeryLightBlueBackground,
-            unfocusedContainerColor = VeryLightBlueBackground,
-            focusedBorderColor = SkyBluePrimary,
-            unfocusedBorderColor = SoftBlueBorder,
-            focusedTextColor = DeepNavyText,
-            unfocusedTextColor = DeepNavyText
-          )
-        )
+            val rentVal = rentAmountString.toLongOrNull() ?: 0L
+            if (rentVal <= 0L) {
+              rentError = DwelloStrings.errorRentRequired(currentLanguage)
+              hasErrors = true
+            } else {
+              rentError = null
+            }
 
-        Spacer(modifier = Modifier.height(24.dp))
+            if (selectedNeighbourhood.isEmpty()) {
+              neighbourhoodError = DwelloStrings.errorNeighbourhoodRequired(currentLanguage)
+              hasErrors = true
+            } else {
+              neighbourhoodError = null
+            }
 
-        // Action Buttons: PREVIEW PROPERTY BEFORE POSTING & SUBMIT DIRECT
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-          // PREVIEW BUTTON
-          OutlinedButton(
-            onClick = { showPreviewDialog = true },
-            modifier = Modifier
-              .weight(1f)
-              .height(56.dp)
-              .testTag("preview_property_button"),
-            shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(2.dp, SkyBluePrimary),
-            colors = ButtonDefaults.outlinedButtonColors(
-              containerColor = Color.White,
-              contentColor = SkyBluePrimary
-            )
-          ) {
-            Icon(imageVector = Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-              text = if (currentLanguage == AppLanguage.ENGLISH) "PREVIEW" else "PREVIEW",
-              style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-            )
-          }
+            if (propertyDescription.trim().isEmpty()) {
+              descriptionError = DwelloStrings.errorDescriptionRequired(currentLanguage)
+              hasErrors = true
+            } else {
+              descriptionError = null
+            }
 
-          // SUBMIT NOW BUTTON
-          Button(
-            onClick = {
-              SamplePropertyData.addProperty(previewProperty)
-              postedRefNumber = "DWL-BEN-${(1000..9999).random()}"
+            if (selectedPhotoUris.isEmpty()) {
+              photosError = DwelloStrings.noPhotosSelected(currentLanguage)
+              hasErrors = true
+            } else {
+              photosError = null
+            }
+
+            if (!hasErrors) {
+              // Create property and set status automatically to PENDING_APPROVAL
+              val newPropId = "prop_landlord_${System.currentTimeMillis()}"
+              val formattedPrice = "₦${String.format("%,d", rentVal)}"
+              val paymentPeriodSuffix = if (rentalPeriod == RentalPeriod.YEARLY) " / year" else " / month"
+
+              val newProperty = PropertyItem(
+                id = newPropId,
+                titleEn = propertyTitle.trim(),
+                titlePidgin = propertyTitle.trim(),
+                categoryEn = selectedPropertyType,
+                categoryPidgin = selectedPropertyType,
+                area = selectedNeighbourhood,
+                priceNaira = rentVal,
+                priceFormatted = formattedPrice,
+                rentalPeriod = rentalPeriod,
+                bedrooms = bedroomsCount,
+                bathrooms = bathroomsCount,
+                isGated = selectedFacilities.contains("Fenced compound") || selectedFacilities.contains("Security"),
+                hasBorehole = selectedFacilities.contains("Water supply") || selectedFacilities.contains("Running water"),
+                hasPrepaidMeter = selectedFacilities.contains("Electricity"),
+                landlordName = SamplePropertyData.CURRENT_LANDLORD_NAME,
+                landlordRoleEn = "Landlord (Property Owner)",
+                landlordRolePidgin = "Direct House Owner",
+                phoneContact = "0800 393 556", // Never expose private landlord phone number to tenants
+                descriptionEn = propertyDescription.trim(),
+                descriptionPidgin = propertyDescription.trim(),
+                neighborhoodNote = addressOrLandmark.ifBlank { "Benin City Residential Axis" },
+                photoUris = selectedPhotoUris.toList(),
+                imageResId = R.drawable.img_benin_house_exterior,
+                facilities = selectedFacilities.toList(),
+                additionalFacilitiesNote = additionalFacilitiesText.trim(),
+                rentalTerms = "${if (rentalPeriod == RentalPeriod.YEARLY) "1 Year" else "Monthly"} rent advance. Inspection strictly coordinated via Dwello Homes.",
+                availabilityStatus = "Under Review by Dwello Homes",
+                approvalStatus = PropertyApprovalStatus.PENDING_APPROVAL,
+                rejectionReason = null,
+                submissionTimestamp = System.currentTimeMillis(),
+                isDemonstrationData = false
+              )
+
+              // Add to repository
+              SamplePropertyData.addProperty(newProperty)
+
+              generatedRefNumber = "DWL-BEN-${(1000..9999).random()}"
               showSuccessDialog = true
-            },
-            modifier = Modifier
-              .weight(1.5f)
-              .height(56.dp)
-              .testTag("submit_post_house_button"),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-              containerColor = SkyBluePrimary,
-              contentColor = Color.White
-            ),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
+            }
+          },
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(58.dp)
+            .testTag("submit_property_button"),
+          shape = RoundedCornerShape(14.dp),
+          colors = ButtonDefaults.buttonColors(
+            containerColor = SkyBluePrimary,
+            contentColor = Color.White
+          ),
+          elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
+        ) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
           ) {
-            Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
+            Icon(
+              imageVector = Icons.Default.CheckCircle,
+              contentDescription = null,
+              tint = Color.White,
+              modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
             Text(
-              text = if (currentLanguage == AppLanguage.ENGLISH) "POST NOW (FREE)" else "PUT NOW (FREE)",
-              style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.ExtraBold
+              text = DwelloStrings.submitButtonText(currentLanguage),
+              style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                letterSpacing = 0.5.sp
               )
             )
           }
         }
+
+        Spacer(modifier = Modifier.height(28.dp))
       }
     }
   }
 
-  // PREVIEW DIALOG
-  if (showPreviewDialog) {
+  // ==========================================
+  // DISCARD CONFIRMATION DIALOG
+  // ==========================================
+  if (showDiscardDialog) {
     AlertDialog(
-      onDismissRequest = { showPreviewDialog = false },
+      onDismissRequest = { showDiscardDialog = false },
+      icon = {
+        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFD97706))
+      },
       title = {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          Icon(Icons.Default.Visibility, contentDescription = null, tint = SkyBluePrimary)
-          Spacer(modifier = Modifier.width(8.dp))
-          Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH) "Preview Your Listing" else "Check Wetin Tenants Go See",
-            fontWeight = FontWeight.Bold,
-            color = DeepNavyText,
-            fontSize = 18.sp
-          )
-        }
+        Text(
+          text = DwelloStrings.discardDialogTitle(currentLanguage),
+          fontWeight = FontWeight.Bold,
+          color = DeepNavyText
+        )
       },
       text = {
-        Column(modifier = Modifier.fillMaxWidth()) {
-          Surface(
-            color = VeryLightBlueBackground,
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.fillMaxWidth()
-          ) {
-            Text(
-              text = if (currentLanguage == AppLanguage.ENGLISH)
-                "This is how tenants in Benin City will see your listing card:"
-              else
-                "Na so tenants go take see your house card:",
-              modifier = Modifier.padding(8.dp),
-              style = MaterialTheme.typography.labelSmall.copy(color = DeepNavyText)
-            )
-          }
-          Spacer(modifier = Modifier.height(10.dp))
-          PropertyCard(
-            property = previewProperty,
-            currentLanguage = currentLanguage,
-            onClick = {},
-            onEnquiryClick = {}
-          )
-        }
+        Text(
+          text = DwelloStrings.discardDialogMessage(currentLanguage),
+          style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText)
+        )
       },
       confirmButton = {
         Button(
           onClick = {
-            showPreviewDialog = false
-            SamplePropertyData.addProperty(previewProperty)
-            postedRefNumber = "DWL-BEN-${(1000..9999).random()}"
-            showSuccessDialog = true
+            showDiscardDialog = false
+            handleBack()
           },
-          colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
+          colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+          modifier = Modifier.testTag("confirm_discard_button")
         ) {
-          Text(if (currentLanguage == AppLanguage.ENGLISH) "Looks Good, Post Now" else "Correct, Post Am")
+          Text(DwelloStrings.discardConfirmBtn(currentLanguage))
         }
       },
       dismissButton = {
         OutlinedButton(
-          onClick = { showPreviewDialog = false },
-          border = BorderStroke(1.dp, SkyBluePrimary)
+          onClick = { showDiscardDialog = false },
+          border = BorderStroke(1.dp, SkyBluePrimary),
+          modifier = Modifier.testTag("cancel_discard_button")
         ) {
-          Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = SkyBluePrimary)
-          Spacer(modifier = Modifier.width(4.dp))
-          Text("Edit Details", color = SkyBluePrimary)
+          Text(DwelloStrings.discardCancelBtn(currentLanguage), color = SkyBluePrimary)
         }
       }
     )
   }
 
-  // Success Dialog
+  // ==========================================
+  // SUBMISSION SUCCESS CONFIRMATION DIALOG
+  // ==========================================
   if (showSuccessDialog) {
     AlertDialog(
-      onDismissRequest = { showSuccessDialog = false },
+      onDismissRequest = {
+        showSuccessDialog = false
+        handleBack()
+      },
+      icon = {
+        Icon(
+          imageVector = Icons.Default.CheckCircle,
+          contentDescription = null,
+          tint = SkyBluePrimary,
+          modifier = Modifier.size(36.dp)
+        )
+      },
       title = {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          Icon(
-            imageVector = Icons.Default.CheckCircle,
-            contentDescription = null,
-            tint = SkyBluePrimary,
-            modifier = Modifier.size(28.dp)
-          )
-          Spacer(modifier = Modifier.width(8.dp))
-          Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH) "Property Submitted for Review" else "House Don Enter for Review",
-            fontWeight = FontWeight.Bold,
-            color = DeepNavyText,
-            fontSize = 18.sp
-          )
-        }
+        Text(
+          text = DwelloStrings.successDialogTitle(currentLanguage),
+          fontWeight = FontWeight.ExtraBold,
+          color = DeepNavyText,
+          fontSize = 20.sp
+        )
       },
       text = {
-        Column {
+        Column(modifier = Modifier.fillMaxWidth()) {
           Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH)
-              "Thank you! Your $houseType at $selectedArea, Benin City has been submitted to Dwello Homes."
-            else
-              "Thank you! Your $houseType for $selectedArea, Benin City don enter Dwello Homes.",
-            style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+            text = DwelloStrings.successDialogMessage(currentLanguage),
+            style = MaterialTheme.typography.bodyMedium.copy(
+              color = DeepNavyText,
+              lineHeight = 22.sp,
+              fontWeight = FontWeight.Medium
+            )
           )
-          Spacer(modifier = Modifier.height(8.dp))
+
+          Spacer(modifier = Modifier.height(12.dp))
+
+          // Pending Approval Badge
           Surface(
             color = Color(0xFFFEF3C7),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, Color(0xFFFDE68A)),
             modifier = Modifier.fillMaxWidth()
           ) {
             Row(
-              modifier = Modifier.padding(10.dp),
+              modifier = Modifier.padding(12.dp),
               verticalAlignment = Alignment.CenterVertically
             ) {
-              Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFFD97706), modifier = Modifier.size(18.dp))
+              Icon(
+                imageVector = Icons.Default.HourglassTop,
+                contentDescription = null,
+                tint = Color(0xFFB45309),
+                modifier = Modifier.size(20.dp)
+              )
               Spacer(modifier = Modifier.width(8.dp))
               Column {
                 Text(
-                  text = "Status: Pending Approval",
-                  style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF92400E))
+                  text = "Status: PENDING APPROVAL",
+                  style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF92400E)
+                  )
                 )
                 Text(
-                  text = if (currentLanguage == AppLanguage.ENGLISH)
-                    "Per Dwello Homes policy, an administrator will verify property details before approving it for public tenant listings."
-                  else
-                    "Dwello Homes admin go check the house details well before e go appear for public search.",
-                  style = MaterialTheme.typography.labelSmall.copy(color = Color(0xFF92400E), fontSize = 11.sp)
+                  text = DwelloStrings.successDialogPendingNote(currentLanguage),
+                  style = MaterialTheme.typography.labelSmall.copy(
+                    color = Color(0xFF92400E),
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp
+                  )
                 )
               }
             }
           }
+
           Spacer(modifier = Modifier.height(10.dp))
+
           Surface(
             color = SoftBlueAccent,
             shape = RoundedCornerShape(8.dp),
             modifier = Modifier.fillMaxWidth()
           ) {
             Text(
-              text = "Listing Ref: $postedRefNumber",
-              modifier = Modifier.padding(10.dp),
-              style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = DeepNavyText)
+              text = "Listing Ref: $generatedRefNumber",
+              modifier = Modifier.padding(8.dp),
+              style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = DeepNavyText
+              )
             )
           }
         }
@@ -799,11 +1397,17 @@ fun PostHouseScreen(
         Button(
           onClick = {
             showSuccessDialog = false
-            onSuccessNavigateHome()
+            handleBack()
           },
-          colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
+          colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("view_in_dashboard_button")
         ) {
-          Text("Done", fontWeight = FontWeight.Bold)
+          Text(
+            text = DwelloStrings.viewInDashboardBtn(currentLanguage),
+            fontWeight = FontWeight.Bold
+          )
         }
       }
     )

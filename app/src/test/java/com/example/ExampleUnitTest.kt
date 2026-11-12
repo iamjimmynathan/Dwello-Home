@@ -1,6 +1,7 @@
 package com.example
 
 import com.example.data.PropertyApprovalStatus
+import com.example.data.PropertyFormValidator
 import com.example.data.PropertyItem
 import com.example.data.RentalPeriod
 import com.example.data.SamplePropertyData
@@ -17,6 +18,10 @@ class ExampleUnitTest {
   fun addition_isCorrect() {
     assertEquals(4, 2 + 2)
   }
+
+  // ==========================================
+  // STAGE 3A TESTS: APPROVAL STATUS & STATS
+  // ==========================================
 
   @Test
   fun testNewPropertyDefaultsToPendingApproval() {
@@ -151,5 +156,186 @@ class ExampleUnitTest {
 
     val publicAfterRestore = SamplePropertyData.getApprovedPublicProperties()
     assertTrue("Restored property must appear in public search", publicAfterRestore.any { it.id == propId })
+  }
+
+  // ==========================================
+  // STAGE 3B TESTS: POST A HOUSE WORKFLOW
+  // ==========================================
+
+  @Test
+  fun testValidPropertySubmissionWorkflow() {
+    // 1. Validate form fields using PropertyFormValidator
+    val validation = PropertyFormValidator.validate(
+      title = "Executive 3-Bedroom Flat in GRA",
+      propertyType = "3-bedroom apartment",
+      rentAmount = 850000L,
+      bedrooms = 3,
+      neighbourhood = "GRA",
+      description = "Spacious all en-suite bedrooms with borehole water and prepaid meter.",
+      photoCount = 3
+    )
+    assertTrue("Form validation must pass for complete and valid fields", validation.isValid)
+    assertNull(validation.titleError)
+    assertNull(validation.typeError)
+    assertNull(validation.rentError)
+    assertNull(validation.neighbourhoodError)
+    assertNull(validation.descriptionError)
+    assertNull(validation.photosError)
+
+    // 2. Submit property to repository
+    val propId = "test_stage3b_${System.currentTimeMillis()}"
+    val newProp = PropertyItem(
+      id = propId,
+      titleEn = "Executive 3-Bedroom Flat in GRA",
+      titlePidgin = "Executive 3-Bedroom Flat in GRA",
+      categoryEn = "3-bedroom apartment",
+      categoryPidgin = "3-bedroom apartment",
+      area = "GRA",
+      priceNaira = 850000L,
+      priceFormatted = "₦850,000",
+      rentalPeriod = RentalPeriod.YEARLY,
+      bedrooms = 3,
+      bathrooms = 3,
+      landlordName = SamplePropertyData.CURRENT_LANDLORD_NAME,
+      descriptionEn = "Spacious all en-suite bedrooms with borehole water and prepaid meter.",
+      descriptionPidgin = "Spacious all en-suite bedrooms with borehole water and prepaid meter.",
+      neighborhoodNote = "Boundary Road, GRA",
+      photoUris = listOf("content://media/external/images/media/101"),
+      facilities = listOf("Water supply", "Electricity", "Security"),
+      approvalStatus = PropertyApprovalStatus.APPROVED, // Must be forced to PENDING_APPROVAL
+      submissionTimestamp = System.currentTimeMillis()
+    )
+
+    SamplePropertyData.addProperty(newProp)
+
+    // 3. Verify newly submitted property defaulted to PENDING_APPROVAL
+    val submittedProp = SamplePropertyData.dynamicProperties.first { it.id == propId }
+    assertEquals(PropertyApprovalStatus.PENDING_APPROVAL, submittedProp.approvalStatus)
+    assertEquals(SamplePropertyData.CURRENT_LANDLORD_NAME, submittedProp.landlordName)
+    assertTrue(submittedProp.photoUris.isNotEmpty())
+
+    // 4. Verify newly submitted property appears in Landlord Dashboard
+    val landlordProps = SamplePropertyData.getLandlordProperties()
+    assertTrue("Newly submitted property must appear in Landlord's list", landlordProps.any { it.id == propId })
+
+    // 5. Verify pending property remains invisible in public tenant search
+    val publicProps = SamplePropertyData.getApprovedPublicProperties()
+    assertFalse("Pending property must not appear in public tenant search", publicProps.any { it.id == propId })
+  }
+
+  @Test
+  fun testMissingRequiredFieldsValidation() {
+    // Missing title
+    val missingTitle = PropertyFormValidator.validate(
+      title = "",
+      propertyType = "Mini flat",
+      rentAmount = 300000L,
+      bedrooms = 1,
+      neighbourhood = "Ugbowo",
+      description = "Nice mini flat",
+      photoCount = 1
+    )
+    assertFalse("Validation should fail when title is blank", missingTitle.isValid)
+    assertNotNull("Title error must be present", missingTitle.titleError)
+
+    // Missing neighbourhood
+    val missingNeighbourhood = PropertyFormValidator.validate(
+      title = "Decent Mini Flat",
+      propertyType = "Mini flat",
+      rentAmount = 300000L,
+      bedrooms = 1,
+      neighbourhood = "",
+      description = "Nice mini flat",
+      photoCount = 1
+    )
+    assertFalse("Validation should fail when neighbourhood is empty", missingNeighbourhood.isValid)
+    assertNotNull("Neighbourhood error must be present", missingNeighbourhood.neighbourhoodError)
+
+    // Missing description
+    val missingDesc = PropertyFormValidator.validate(
+      title = "Decent Mini Flat",
+      propertyType = "Mini flat",
+      rentAmount = 300000L,
+      bedrooms = 1,
+      neighbourhood = "Airport Road",
+      description = "   ",
+      photoCount = 1
+    )
+    assertFalse("Validation should fail when description is blank", missingDesc.isValid)
+    assertNotNull("Description error must be present", missingDesc.descriptionError)
+
+    // Missing photo (photoCount = 0)
+    val missingPhotos = PropertyFormValidator.validate(
+      title = "Decent Mini Flat",
+      propertyType = "Mini flat",
+      rentAmount = 300000L,
+      bedrooms = 1,
+      neighbourhood = "Airport Road",
+      description = "Nice mini flat",
+      photoCount = 0
+    )
+    assertFalse("Validation should fail when no photo is selected", missingPhotos.isValid)
+    assertNotNull("Photos error must be present", missingPhotos.photosError)
+  }
+
+  @Test
+  fun testInvalidRentAmountValidation() {
+    // Rent = 0
+    val zeroRent = PropertyFormValidator.validate(
+      title = "Self Con in Ekosodin",
+      propertyType = "Self-contained",
+      rentAmount = 0L,
+      bedrooms = 1,
+      neighbourhood = "Ekosodin",
+      description = "Student self con",
+      photoCount = 1
+    )
+    assertFalse("Validation must fail when rent amount is 0", zeroRent.isValid)
+    assertNotNull("Rent error must be present", zeroRent.rentError)
+
+    // Rent negative
+    val negativeRent = PropertyFormValidator.validate(
+      title = "Self Con in Ekosodin",
+      propertyType = "Self-contained",
+      rentAmount = -50000L,
+      bedrooms = 1,
+      neighbourhood = "Ekosodin",
+      description = "Student self con",
+      photoCount = 1
+    )
+    assertFalse("Validation must fail when rent amount is negative", negativeRent.isValid)
+    assertNotNull("Rent error must be present", negativeRent.rentError)
+  }
+
+  @Test
+  fun testExistingApprovedPropertiesRemainVisible() {
+    val initialApproved = SamplePropertyData.getApprovedPublicProperties()
+    val approvedCount = initialApproved.size
+    assertTrue("Initial approved public properties must not be empty", approvedCount > 0)
+
+    // Submit a pending property
+    val pendingProp = PropertyItem(
+      id = "temp_pending_${System.currentTimeMillis()}",
+      titleEn = "New Pending Flat",
+      titlePidgin = "New Pending Flat",
+      categoryEn = "2-bedroom apartment",
+      categoryPidgin = "2-bedroom apartment",
+      area = "Ogida",
+      priceNaira = 400000L,
+      priceFormatted = "₦400,000",
+      bedrooms = 2,
+      bathrooms = 1,
+      landlordName = SamplePropertyData.CURRENT_LANDLORD_NAME,
+      descriptionEn = "Pending verification flat",
+      descriptionPidgin = "Pending verification flat",
+      neighborhoodNote = "Near Siluko",
+      approvalStatus = PropertyApprovalStatus.PENDING_APPROVAL
+    )
+    SamplePropertyData.addProperty(pendingProp)
+
+    // Verify existing approved properties are still visible and unchanged
+    val approvedAfter = SamplePropertyData.getApprovedPublicProperties()
+    assertEquals("Approved public properties count must remain unchanged after adding pending listing", approvedCount, approvedAfter.size)
+    assertFalse("Approved list must not contain the new pending property", approvedAfter.any { it.id == pendingProp.id })
   }
 }
