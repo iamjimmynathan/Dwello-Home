@@ -48,7 +48,17 @@ data class PropertyItem(
   val rentalTerms: String = "1 Year rent in advance. 10% Caution deposit refundable at vacancy. Tenancy agreement handled via Dwello Homes.",
   val availabilityStatus: String = "Available for Inspection",
   val approvalStatus: PropertyApprovalStatus = PropertyApprovalStatus.APPROVED,
+  val rejectionReason: String? = null,
   val isDemonstrationData: Boolean = true
+)
+
+data class LandlordDashboardStats(
+  val totalProperties: Int,
+  val approvedCount: Int,
+  val pendingCount: Int,
+  val rejectedCount: Int,
+  val unavailableCount: Int,
+  val newEnquiriesCount: Int
 )
 
 data class BeninCityArea(
@@ -87,6 +97,19 @@ object EnquiryRepository {
       message = "I want to inspect this flat near UNIBEN main gate. Please coordinate with the owner.",
       statusEn = "Dwello Coordinator Assigned",
       statusPidgin = "Dwello Coordinator Don Ready"
+    ),
+    EnquiryItem(
+      id = "enq_demo_2",
+      propertyId = "prop_2",
+      propertyTitle = "Spacious 2-Bedroom Flat",
+      propertyArea = "GRA",
+      propertyPrice = "₦650,000 / year",
+      tenantName = "Eseosa Idahosa",
+      tenantPhone = "0812 987 6543",
+      preferredInspectionDate = "Sunday 2:00 PM",
+      message = "Interested in inspecting the 2-bedroom executive flat in GRA.",
+      statusEn = "Inspection Requested",
+      statusPidgin = "Inspection Request Don Enter"
     )
   )
 
@@ -475,8 +498,109 @@ object SamplePropertyData {
       availabilityStatus = "Available for Inspection",
       approvalStatus = PropertyApprovalStatus.APPROVED,
       isDemonstrationData = true
+    ),
+
+    // 11. Landlord Dashboard Demo: Pending Approval
+    PropertyItem(
+      id = "prop_landlord_pending",
+      titleEn = "New Executive 2-Bedroom Flat",
+      titlePidgin = "New 2-Bedroom Flat",
+      categoryEn = "2-bedroom apartment",
+      categoryPidgin = "2-bedroom apartment",
+      area = "Ugbowo",
+      priceNaira = 480000,
+      priceFormatted = "₦480,000",
+      rentalPeriod = RentalPeriod.YEARLY,
+      bedrooms = 2,
+      bathrooms = 2,
+      isGated = true,
+      hasBorehole = true,
+      hasPrepaidMeter = true,
+      landlordName = "Mr. Osasere",
+      landlordRoleEn = "Landlord (Direct)",
+      landlordRolePidgin = "Direct House Owner",
+      phoneContact = "0803 555 1234",
+      descriptionEn = "Brand new tiled 2-bedroom flat with POP ceiling, individual borehole connection, private prepaid meter, and interlocked car pack.",
+      descriptionPidgin = "Brand new 2-bedroom with POP ceiling, personal tap water and prepaid meter.",
+      neighborhoodNote = "Near UBTH Senior Staff Quarters, Ugbowo",
+      imageResId = R.drawable.img_benin_house_exterior,
+      imageResList = listOf(R.drawable.img_benin_house_exterior, R.drawable.img_benin_house_interior),
+      facilities = listOf("Borehole Water", "Prepaid Meter", "Car Park", "Gated Security"),
+      rentalTerms = "1 Year upfront rent. Dwello Homes tenancy agreement.",
+      availabilityStatus = "Under Review by Dwello Homes",
+      approvalStatus = PropertyApprovalStatus.PENDING_APPROVAL,
+      rejectionReason = null,
+      isDemonstrationData = false
+    ),
+
+    // 12. Landlord Dashboard Demo: Rejected with Moderation Reason
+    PropertyItem(
+      id = "prop_landlord_rejected",
+      titleEn = "Studio Self-Contained Apartment",
+      titlePidgin = "Self-Con Apartment",
+      categoryEn = "Self-contained",
+      categoryPidgin = "Self-contained",
+      area = "Sapele Road",
+      priceNaira = 220000,
+      priceFormatted = "₦220,000",
+      rentalPeriod = RentalPeriod.YEARLY,
+      bedrooms = 1,
+      bathrooms = 1,
+      isGated = false,
+      hasBorehole = true,
+      hasPrepaidMeter = true,
+      landlordName = "Mr. Osasere",
+      landlordRoleEn = "Landlord (Direct)",
+      landlordRolePidgin = "Direct House Owner",
+      phoneContact = "0803 555 1234",
+      descriptionEn = "Tiled room and bathroom near Sapele Road bypass.",
+      descriptionPidgin = "Clean room and bath near Sapele Road.",
+      neighborhoodNote = "Off Sapele Road bypass",
+      imageResId = R.drawable.img_benin_flat_interior_1794407048683,
+      imageResList = listOf(R.drawable.img_benin_flat_interior_1794407048683),
+      facilities = listOf("Borehole Water", "Prepaid Meter"),
+      rentalTerms = "1 Year rent in advance.",
+      availabilityStatus = "Listing Not Approved",
+      approvalStatus = PropertyApprovalStatus.REJECTED,
+      rejectionReason = "Missing clear exterior photograph of the compound fence and security gate. Please update your listing with verified exterior photographs before resubmitting.",
+      isDemonstrationData = false
+    ),
+
+    // 13. Landlord Dashboard Demo: Marked Unavailable by Landlord
+    PropertyItem(
+      id = "prop_landlord_unavail",
+      titleEn = "Cozy 1-Bedroom Mini-Flat",
+      titlePidgin = "Cozy Mini-Flat",
+      categoryEn = "Mini flat",
+      categoryPidgin = "Mini flat",
+      area = "GRA",
+      priceNaira = 400000,
+      priceFormatted = "₦400,000",
+      rentalPeriod = RentalPeriod.YEARLY,
+      bedrooms = 1,
+      bathrooms = 1,
+      isGated = true,
+      hasBorehole = true,
+      hasPrepaidMeter = true,
+      landlordName = "Mr. Osasere",
+      landlordRoleEn = "Landlord (Direct)",
+      landlordRolePidgin = "Direct House Owner",
+      phoneContact = "0803 555 1234",
+      descriptionEn = "Executive mini-flat inside quiet GRA compound. Currently occupied by tenant.",
+      descriptionPidgin = "Fine mini-flat inside GRA. Tenant dey inside currently.",
+      neighborhoodNote = "Off Boundary Road, GRA",
+      imageResId = R.drawable.img_benin_house_interior,
+      imageResList = listOf(R.drawable.img_benin_house_interior),
+      facilities = listOf("Water", "Prepaid Meter", "Gated Compound"),
+      rentalTerms = "1 Year rent.",
+      availabilityStatus = "Currently Occupied / Unavailable",
+      approvalStatus = PropertyApprovalStatus.UNAVAILABLE,
+      rejectionReason = null,
+      isDemonstrationData = false
     )
   )
+
+  const val CURRENT_LANDLORD_NAME = "Mr. Osasere"
 
   /**
    * Rule: Newly submitted properties must automatically receive Pending Approval status.
@@ -484,7 +608,12 @@ object SamplePropertyData {
    */
   fun addProperty(item: PropertyItem) {
     // Enforce business rule: new landlord properties are always PENDING_APPROVAL
-    val pendingItem = item.copy(approvalStatus = PropertyApprovalStatus.PENDING_APPROVAL)
+    val pendingItem = item.copy(
+      approvalStatus = PropertyApprovalStatus.PENDING_APPROVAL,
+      landlordName = CURRENT_LANDLORD_NAME,
+      availabilityStatus = "Under Review by Dwello Homes",
+      rejectionReason = null
+    )
     dynamicProperties.add(0, pendingItem)
   }
 
@@ -493,6 +622,127 @@ object SamplePropertyData {
    */
   fun getApprovedPublicProperties(): List<PropertyItem> {
     return dynamicProperties.filter { it.approvalStatus == PropertyApprovalStatus.APPROVED }
+  }
+
+  /**
+   * Fetch properties belonging to the current landlord.
+   */
+  fun getLandlordProperties(landlordName: String = CURRENT_LANDLORD_NAME): List<PropertyItem> {
+    return dynamicProperties.filter {
+      it.landlordName.equals(landlordName, ignoreCase = true) ||
+      it.landlordName.contains("Osasere", ignoreCase = true) ||
+      !it.isDemonstrationData
+    }
+  }
+
+  /**
+   * Calculate dashboard statistics for the landlord.
+   */
+  fun getLandlordStats(landlordName: String = CURRENT_LANDLORD_NAME): LandlordDashboardStats {
+    val props = getLandlordProperties(landlordName)
+    val total = props.size
+    val approved = props.count { it.approvalStatus == PropertyApprovalStatus.APPROVED }
+    val pending = props.count { it.approvalStatus == PropertyApprovalStatus.PENDING_APPROVAL }
+    val rejected = props.count { it.approvalStatus == PropertyApprovalStatus.REJECTED }
+    val unavailable = props.count { it.approvalStatus == PropertyApprovalStatus.UNAVAILABLE }
+
+    val propIds = props.map { it.id }.toSet()
+    val enquiriesCount = EnquiryRepository.submittedEnquiries.count { it.propertyId in propIds }
+
+    return LandlordDashboardStats(
+      totalProperties = total,
+      approvedCount = approved,
+      pendingCount = pending,
+      rejectedCount = rejected,
+      unavailableCount = unavailable,
+      newEnquiriesCount = enquiriesCount
+    )
+  }
+
+  /**
+   * Edit listing details.
+   * Business rule: If the listing was REJECTED, saving changes automatically resets
+   * status to PENDING_APPROVAL and clears rejection reason for moderation review.
+   */
+  fun updatePropertyListing(
+    propertyId: String,
+    newTitle: String,
+    newPriceNaira: Long,
+    newArea: String,
+    newDescription: String,
+    newRentalTerms: String
+  ): Boolean {
+    val index = dynamicProperties.indexOfFirst { it.id == propertyId }
+    if (index != -1) {
+      val cur = dynamicProperties[index]
+      val priceFmt = "₦" + String.format("%,d", newPriceNaira)
+      val newStatus = if (cur.approvalStatus == PropertyApprovalStatus.REJECTED) {
+        PropertyApprovalStatus.PENDING_APPROVAL
+      } else {
+        cur.approvalStatus
+      }
+      dynamicProperties[index] = cur.copy(
+        titleEn = newTitle,
+        titlePidgin = newTitle,
+        priceNaira = newPriceNaira,
+        priceFormatted = priceFmt,
+        area = newArea,
+        descriptionEn = newDescription,
+        descriptionPidgin = newDescription,
+        rentalTerms = newRentalTerms,
+        approvalStatus = newStatus,
+        rejectionReason = if (newStatus == PropertyApprovalStatus.PENDING_APPROVAL) null else cur.rejectionReason,
+        availabilityStatus = if (newStatus == PropertyApprovalStatus.PENDING_APPROVAL) "Under Review by Dwello Homes" else cur.availabilityStatus
+      )
+      return true
+    }
+    return false
+  }
+
+  /**
+   * Mark property as unavailable or restore availability.
+   * Business rule: Landlords can mark their property as unavailable (e.g. rented out).
+   * When marked unavailable, it is immediately removed from public searches.
+   */
+  fun toggleListingAvailability(propertyId: String): PropertyApprovalStatus {
+    val index = dynamicProperties.indexOfFirst { it.id == propertyId }
+    if (index != -1) {
+      val cur = dynamicProperties[index]
+      val targetStatus = if (cur.approvalStatus == PropertyApprovalStatus.UNAVAILABLE) {
+        PropertyApprovalStatus.APPROVED
+      } else {
+        PropertyApprovalStatus.UNAVAILABLE
+      }
+      dynamicProperties[index] = cur.copy(
+        approvalStatus = targetStatus,
+        availabilityStatus = if (targetStatus == PropertyApprovalStatus.UNAVAILABLE) {
+          "Unavailable / Occupied"
+        } else {
+          "Available for Inspection"
+        }
+      )
+      return targetStatus
+    }
+    return PropertyApprovalStatus.UNAVAILABLE
+  }
+
+  /**
+   * Re-submit a rejected listing after rectifying details.
+   */
+  fun resubmitRejectedProperty(propertyId: String): Boolean {
+    val index = dynamicProperties.indexOfFirst { it.id == propertyId }
+    if (index != -1) {
+      val cur = dynamicProperties[index]
+      if (cur.approvalStatus == PropertyApprovalStatus.REJECTED) {
+        dynamicProperties[index] = cur.copy(
+          approvalStatus = PropertyApprovalStatus.PENDING_APPROVAL,
+          rejectionReason = null,
+          availabilityStatus = "Under Review by Dwello Homes"
+        )
+        return true
+      }
+    }
+    return false
   }
 
   /**

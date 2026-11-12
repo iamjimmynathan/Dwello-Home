@@ -258,4 +258,90 @@ object DwelloStrings {
     AppLanguage.ENGLISH -> "Language: English"
     AppLanguage.PIDGIN -> "Language: Pidgin"
   }
+
+  // Landlord Dashboard Stage 3A Strings
+  fun landlordDashboardTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Landlord Dashboard"
+    AppLanguage.PIDGIN -> "Landlord Office"
+  }
+
+  fun landlordDashboardSubtitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Manage listings, track approval status, and view enquiries"
+    AppLanguage.PIDGIN -> "Manage your houses, see approval status, and check tenant enquiries"
+  }
+
+  fun statTotalProperties(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Total Properties"
+    AppLanguage.PIDGIN -> "Total Houses"
+  }
+
+  fun statApprovedProperties(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Approved & Live"
+    AppLanguage.PIDGIN -> "Approved (Live)"
+  }
+
+  fun statPendingApproval(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Pending Approval"
+    AppLanguage.PIDGIN -> "Under Review"
+  }
+
+  fun statRejectedProperties(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Rejected"
+    AppLanguage.PIDGIN -> "Rejected"
+  }
+
+  fun statNewEnquiries(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "New Enquiries"
+    AppLanguage.PIDGIN -> "New Enquiries"
+  }
+
+  fun addNewPropertyButton(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "ADD NEW PROPERTY"
+    AppLanguage.PIDGIN -> "PUT NEW HOUSE"
+  }
+
+  fun myPropertiesHeading(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "My Properties"
+    AppLanguage.PIDGIN -> "My Houses"
+  }
+
+  fun filterAll(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "All"
+    AppLanguage.PIDGIN -> "All"
+  }
+
+  fun editListingButton(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Edit Listing"
+    AppLanguage.PIDGIN -> "Edit Details"
+  }
+
+  fun markUnavailableButton(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Mark Unavailable"
+    AppLanguage.PIDGIN -> "Mark Unavailable"
+  }
+
+  fun markAvailableButton(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Mark as Available"
+    AppLanguage.PIDGIN -> "Make am Available"
+  }
+
+  fun rejectionReasonTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Dwello Homes Moderation Feedback:"
+    AppLanguage.PIDGIN -> "Wetin Dwello Homes Admin Talk:"
+  }
+
+  fun rejectionFixHelp(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Tap 'Edit Listing' to rectify the items noted and resubmit for verification."
+    AppLanguage.PIDGIN -> "Touch 'Edit Details' to fix the things wey dem talk and resubmit am."
+  }
+
+  fun noSelfApprovalNotice(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Notice: In accordance with Dwello Homes safety standards, all listings are independently verified by our admin team before publication. Landlords cannot approve their own listings."
+    AppLanguage.PIDGIN -> "Notice: For safety sake, Dwello Homes team must verify house details before e show to tenants. Landlord no fit approve im own house by imself."
+  }
+
+  fun privatePhoneProtectedNotice(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Privacy Protected: Your personal phone number is never exposed to tenants. Inspections and enquiries are coordinated through Dwello Homes."
+    AppLanguage.PIDGIN -> "Privacy Protected: Tenants no go see your phone number. Dwello Homes dey coordinate all inspections."
+  }
 }
