@@ -1,10 +1,18 @@
 package com.example
 
+import com.example.data.AppLanguage
+import com.example.data.AuthAccountRole
+import com.example.data.AuthBackendResult
+import com.example.data.AuthFormValidator
+import com.example.data.DemoAuthGateway
+import com.example.data.NigerianPhoneNormalizer
 import com.example.data.PropertyApprovalStatus
 import com.example.data.PropertyFormValidator
 import com.example.data.PropertyItem
 import com.example.data.RentalPeriod
+import com.example.data.RoleNavigationRouter
 import com.example.data.SamplePropertyData
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -337,5 +345,168 @@ class ExampleUnitTest {
     val approvedAfter = SamplePropertyData.getApprovedPublicProperties()
     assertEquals("Approved public properties count must remain unchanged after adding pending listing", approvedCount, approvedAfter.size)
     assertFalse("Approved list must not contain the new pending property", approvedAfter.any { it.id == pendingProp.id })
+  }
+
+  // ==========================================
+  // STAGE 4 TESTS: AUTH, ROLES & PHONE NORMALIZATION
+  // ==========================================
+
+  @Test
+  fun testOnlyTenantAndLandlordPublicRolesExist() {
+    val roles = AuthAccountRole.entries.map { it.name }
+    assertEquals(2, roles.size)
+    assertTrue(roles.contains("TENANT"))
+    assertTrue(roles.contains("LANDLORD"))
+    assertFalse(roles.contains("AGENT"))
+    assertFalse(roles.contains("ADMIN"))
+  }
+
+  @Test
+  fun testRoleBasedPostLoginRoutingAndAccessGuards() {
+    // Post-login destinations
+    assertEquals(DwelloNavScreen.HOME, RoleNavigationRouter.postLoginDestination(AuthAccountRole.TENANT))
+    assertEquals(DwelloNavScreen.LANDLORD_DASHBOARD, RoleNavigationRouter.postLoginDestination(AuthAccountRole.LANDLORD))
+
+    // Tenant restrictions
+    assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.HOME))
+    assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.FIND_HOUSES))
+    assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.MESSAGES))
+    assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.PROFILE))
+    assertFalse(
+      "Tenants must NOT access Landlord Dashboard",
+      RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.LANDLORD_DASHBOARD)
+    )
+    assertFalse(
+      "Tenants must NOT access Post House",
+      RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.POST_HOUSE)
+    )
+
+    // Landlord restrictions
+    assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.LANDLORD_DASHBOARD))
+    assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.POST_HOUSE))
+    assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.MESSAGES))
+    assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.PROFILE))
+    assertFalse(
+      "Landlords must NOT access Tenant Home without switching role",
+      RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.HOME)
+    )
+    assertFalse(
+      "Landlords must NOT access Find Houses without switching role",
+      RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.FIND_HOUSES)
+    )
+  }
+
+  @Test
+  fun testNigerianPhoneNumberNormalization() {
+    // Valid Nigerian mobile formats all normalize to +234XXXXXXXXXX
+    assertEquals("+2348031234567", NigerianPhoneNormalizer.normalizeToE164("08031234567"))
+    assertEquals("+2348031234567", NigerianPhoneNormalizer.normalizeToE164("0803 123 4567"))
+    assertEquals("+2348031234567", NigerianPhoneNormalizer.normalizeToE164("8031234567"))
+    assertEquals("+2348031234567", NigerianPhoneNormalizer.normalizeToE164("+2348031234567"))
+    assertEquals("+2348031234567", NigerianPhoneNormalizer.normalizeToE164("2348031234567"))
+    assertEquals("+2348031234567", NigerianPhoneNormalizer.normalizeToE164("+23408031234567"))
+    assertEquals("+2349012345678", NigerianPhoneNormalizer.normalizeToE164("0901-234-5678"))
+    assertEquals("+2347065551234", NigerianPhoneNormalizer.normalizeToE164("0706 555 1234"))
+
+    // Invalid phone numbers
+    assertNull(NigerianPhoneNormalizer.normalizeToE164(""))
+    assertNull(NigerianPhoneNormalizer.normalizeToE164("0803123"))
+    assertNull(NigerianPhoneNormalizer.normalizeToE164("01234567890"))
+    assertNull(NigerianPhoneNormalizer.normalizeToE164("+447911123456"))
+    assertFalse(NigerianPhoneNormalizer.isValidNigerianPhone("12345"))
+  }
+
+  @Test
+  fun testRegistrationValidationWithOptionalEmailAndPasswordRules() {
+    // 1. Valid registration with blank optional email
+    val validWithoutEmail = AuthFormValidator.validateRegistration(
+      fullName = "Osaro Ighodaro",
+      phoneNumber = "0803 123 4567",
+      email = "",
+      password = "Password123",
+      confirmPassword = "Password123",
+      acceptedTerms = true,
+      selectedRole = AuthAccountRole.TENANT,
+      language = AppLanguage.ENGLISH
+    )
+    assertTrue("Registration should succeed with optional email left blank", validWithoutEmail.isValid)
+    assertEquals("+2348031234567", validWithoutEmail.normalizedPhone)
+    assertNull(validWithoutEmail.emailError)
+
+    // 2. Invalid non-empty email fails
+    val invalidEmail = AuthFormValidator.validateRegistration(
+      fullName = "Osaro Ighodaro",
+      phoneNumber = "08031234567",
+      email = "not-an-email",
+      password = "Password123",
+      confirmPassword = "Password123",
+      acceptedTerms = true,
+      selectedRole = AuthAccountRole.LANDLORD,
+      language = AppLanguage.ENGLISH
+    )
+    assertFalse(invalidEmail.isValid)
+    assertNotNull(invalidEmail.emailError)
+
+    // 3. Password shorter than 8 characters & mismatch fail
+    val shortAndMismatch = AuthFormValidator.validateRegistration(
+      fullName = "Efe Omoregie",
+      phoneNumber = "08123456789",
+      email = "efe@example.com",
+      password = "pass",
+      confirmPassword = "different",
+      acceptedTerms = false,
+      selectedRole = null,
+      language = AppLanguage.PIDGIN
+    )
+    assertFalse(shortAndMismatch.isValid)
+    assertNotNull(shortAndMismatch.passwordError)
+    assertNotNull(shortAndMismatch.confirmPasswordError)
+    assertNotNull(shortAndMismatch.termsError)
+    assertNotNull(shortAndMismatch.roleError)
+  }
+
+  @Test
+  fun testLoginAndForgotPasswordValidationAndDemoGatewayHonesty() = runBlocking {
+    // Login uses Nigerian phone + password (no email required)
+    val validLogin = AuthFormValidator.validateLogin(
+      phoneNumber = "+234 803 123 4567",
+      password = "MySecretPassword",
+      language = AppLanguage.ENGLISH
+    )
+    assertTrue(validLogin.isValid)
+    assertEquals("+2348031234567", validLogin.normalizedPhone)
+
+    val invalidLogin = AuthFormValidator.validateLogin(
+      phoneNumber = "123",
+      password = "123",
+      language = AppLanguage.ENGLISH
+    )
+    assertFalse(invalidLogin.isValid)
+    assertNotNull(invalidLogin.phoneError)
+    assertNotNull(invalidLogin.passwordError)
+
+    // Forgot password validation
+    val forgotValid = AuthFormValidator.validateForgotPassword("08091234567")
+    assertTrue(forgotValid.isValid)
+    assertEquals("+2348091234567", forgotValid.normalizedPhone)
+
+    val forgotInvalid = AuthFormValidator.validateForgotPassword("000")
+    assertFalse(forgotInvalid.isValid)
+    assertNotNull(forgotInvalid.phoneError)
+
+    // DemoAuthGateway clears sensitive password CharArray and does not fake OTP delivery
+    val regChars = "SecretPass1".toCharArray()
+    val regResult = DemoAuthGateway.registerWithPhone(
+      fullName = "Test User",
+      normalizedPhone = "+2348031234567",
+      email = null,
+      rawPasswordChars = regChars,
+      role = AuthAccountRole.TENANT
+    )
+    assertTrue(regResult is AuthBackendResult.DemoValidationPassed)
+    assertTrue("Password buffer must be cleared after demo validation", regChars.all { it == '\u0000' })
+
+    val otpResult = DemoAuthGateway.requestPasswordResetOtp("+2348031234567")
+    assertTrue("OTP recovery must honestly report backend not connected", otpResult is AuthBackendResult.BackendNotConnected)
   }
 }

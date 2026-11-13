@@ -59,6 +59,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import com.example.data.AppLanguage
+import com.example.data.AuthAccountRole
 import com.example.data.DwelloStrings
 import com.example.data.PropertyApprovalStatus
 import com.example.data.SamplePropertyData
@@ -83,11 +84,17 @@ fun ProfileScreen(
   currentLanguage: AppLanguage,
   onLanguageSelected: (AppLanguage) -> Unit,
   onLanguageToggle: () -> Unit,
+  activeRole: AuthAccountRole = AuthAccountRole.TENANT,
+  onRoleChange: (AuthAccountRole) -> Unit = {},
+  onOpenWelcomeAuth: () -> Unit = {},
   onNavigateToLandlordDashboard: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
-  var selectedRole by remember { mutableStateOf(UserRole.TENANT) }
+  val selectedRole = when (activeRole) {
+    AuthAccountRole.TENANT -> UserRole.TENANT
+    AuthAccountRole.LANDLORD -> UserRole.LANDLORD
+  }
 
   Column(
     modifier = modifier
@@ -200,14 +207,14 @@ fun ProfileScreen(
             modifier = Modifier
               .weight(1f)
               .clip(RoundedCornerShape(12.dp))
-              .clickable { selectedRole = UserRole.TENANT }
+              .clickable { onRoleChange(AuthAccountRole.TENANT) }
               .testTag("role_tenant_btn"),
             color = if (isTenant) SkyBluePrimary else Color.White,
             shape = RoundedCornerShape(12.dp),
             border = BorderStroke(1.dp, if (isTenant) SkyBluePrimary else SoftBlueBorder)
           ) {
             Row(
-              modifier = Modifier.padding(vertical = 12.dp),
+              modifier = Modifier.padding(vertical = 14.dp),
               horizontalArrangement = Arrangement.Center,
               verticalAlignment = Alignment.CenterVertically
             ) {
@@ -234,14 +241,14 @@ fun ProfileScreen(
             modifier = Modifier
               .weight(1f)
               .clip(RoundedCornerShape(12.dp))
-              .clickable { selectedRole = UserRole.LANDLORD }
+              .clickable { onRoleChange(AuthAccountRole.LANDLORD) }
               .testTag("role_landlord_btn"),
             color = if (isLandlord) SkyBluePrimary else Color.White,
             shape = RoundedCornerShape(12.dp),
             border = BorderStroke(1.dp, if (isLandlord) SkyBluePrimary else SoftBlueBorder)
           ) {
             Row(
-              modifier = Modifier.padding(vertical = 12.dp),
+              modifier = Modifier.padding(vertical = 14.dp),
               horizontalArrangement = Arrangement.Center,
               verticalAlignment = Alignment.CenterVertically
             ) {
@@ -261,6 +268,29 @@ fun ProfileScreen(
               )
             }
           }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedButton(
+          onClick = onOpenWelcomeAuth,
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .testTag("profile_open_auth_button"),
+          shape = RoundedCornerShape(12.dp),
+          border = BorderStroke(1.5.dp, SkyBluePrimary)
+        ) {
+          Text(
+            text = if (currentLanguage == AppLanguage.ENGLISH)
+              "Welcome / Login / Registration Screens"
+            else
+              "Open Welcome / Login / Register",
+            style = MaterialTheme.typography.labelLarge.copy(
+              color = SkyBluePrimary,
+              fontWeight = FontWeight.Bold
+            )
+          )
         }
 
         Spacer(modifier = Modifier.height(18.dp))

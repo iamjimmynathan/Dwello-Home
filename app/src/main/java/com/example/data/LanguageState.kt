@@ -570,4 +570,311 @@ object DwelloStrings {
     AppLanguage.ENGLISH -> "VIEW IN MY PROPERTIES"
     AppLanguage.PIDGIN -> "CHECK FOR MY HOUSES"
   }
+
+  // --- STAGE 4: WELCOME, ACCOUNT SELECTION, REGISTRATION, LOGIN & RECOVERY STRINGS ---
+  fun welcomeHeading(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Find a place to call home."
+    AppLanguage.PIDGIN -> "Find better place wey you go call home."
+  }
+
+  fun welcomeSupportingText(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Discover available houses or list your property with Dwello Homes."
+    AppLanguage.PIDGIN -> "Find house wey dey available or put your own house for Dwello Homes."
+  }
+
+  fun getStartedBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Get Started"
+    AppLanguage.PIDGIN -> "Start Now"
+  }
+
+  fun loginBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Login"
+    AppLanguage.PIDGIN -> "Login"
+  }
+
+  fun welcomeDemoBadge(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Benin City, Edo State • Tenant & Landlord Platform"
+    AppLanguage.PIDGIN -> "Benin City, Edo State • For Tenants & Landlords"
+  }
+
+  fun continueDemoGuest(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Browse Houses in Demo Preview →"
+    AppLanguage.PIDGIN -> "Check Houses for Demo Preview →"
+  }
+
+  // Account Type Selection
+  fun accountTypeTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Choose Your Account Type"
+    AppLanguage.PIDGIN -> "Pick Your Account Type"
+  }
+
+  fun accountTypeSubtitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Select how you want to use Dwello Homes in Benin City."
+    AppLanguage.PIDGIN -> "Tell us how you wan use Dwello Homes for Benin City."
+  }
+
+  fun tenantAccountLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "TENANT"
+    AppLanguage.PIDGIN -> "TENANT"
+  }
+
+  fun tenantAccountHeading(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "I'm looking for a house."
+    AppLanguage.PIDGIN -> "I dey find house to rent."
+  }
+
+  fun tenantAccountDescription(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Find available houses around Benin City and contact Dwello Homes."
+    AppLanguage.PIDGIN -> "Find available houses around Benin City and message Dwello Homes."
+  }
+
+  fun landlordAccountLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "LANDLORD"
+    AppLanguage.PIDGIN -> "LANDLORD"
+  }
+
+  fun landlordAccountHeading(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "I want to rent out my property."
+    AppLanguage.PIDGIN -> "I wan put my house for rent."
+  }
+
+  fun landlordAccountDescription(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "List your property, manage availability, and receive enquiries through Dwello Homes."
+    AppLanguage.PIDGIN -> "Submit your house, manage availability, and collect enquiries through Dwello Homes."
+  }
+
+  fun continueToRegistrationBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Continue to Registration"
+    AppLanguage.PIDGIN -> "Continue to Register"
+  }
+
+  fun noAgentNotice(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Dwello Homes connects Tenants and Landlords directly. There is no Agent role on this platform."
+    AppLanguage.PIDGIN -> "Dwello Homes dey connect Tenants and Landlords direct. No Agent account dey here."
+  }
+
+  // Registration
+  fun registerTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Create Your Account"
+    AppLanguage.PIDGIN -> "Open Your Account"
+  }
+
+  fun registerSubtitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Enter your details below to register with Dwello Homes."
+    AppLanguage.PIDGIN -> "Put your details below to join Dwello Homes."
+  }
+
+  fun selectedRoleBannerLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Account Type:"
+    AppLanguage.PIDGIN -> "Account Type:"
+  }
+
+  fun changeRoleText(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Change"
+    AppLanguage.PIDGIN -> "Change am"
+  }
+
+  fun fullNameLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Full Name"
+    AppLanguage.PIDGIN -> "Your Full Name"
+  }
+
+  fun fullNamePlaceholder(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "e.g. Osaro Ighodaro"
+    AppLanguage.PIDGIN -> "e.g. Osaro Ighodaro"
+  }
+
+  fun phoneNumberLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Nigerian Phone Number"
+    AppLanguage.PIDGIN -> "Nigeria Phone Number"
+  }
+
+  fun phoneNumberPlaceholder(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "e.g. 0803 123 4567"
+    AppLanguage.PIDGIN -> "e.g. 0803 123 4567"
+  }
+
+  fun emailOptionalLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Email Address (Optional)"
+    AppLanguage.PIDGIN -> "Email Address (No Be Must)"
+  }
+
+  fun emailPlaceholder(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "e.g. name@example.com"
+    AppLanguage.PIDGIN -> "e.g. name@example.com"
+  }
+
+  fun passwordLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Password"
+    AppLanguage.PIDGIN -> "Password"
+  }
+
+  fun passwordHelper(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Minimum 8 characters"
+    AppLanguage.PIDGIN -> "Make e reach 8 characters or more"
+  }
+
+  fun confirmPasswordLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Confirm Password"
+    AppLanguage.PIDGIN -> "Write Password Again"
+  }
+
+  fun acceptTermsLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "I agree to the Dwello Homes Terms and Conditions and Privacy Policy"
+    AppLanguage.PIDGIN -> "I agree to Dwello Homes Terms and Conditions and Privacy Policy"
+  }
+
+  fun createAccountBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Create Account"
+    AppLanguage.PIDGIN -> "Create Account"
+  }
+
+  fun alreadyHaveAccountPrompt(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Already have an account? Login"
+    AppLanguage.PIDGIN -> "You don get account already? Login"
+  }
+
+  // Login
+  fun loginTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Welcome Back"
+    AppLanguage.PIDGIN -> "Welcome Back"
+  }
+
+  fun loginSubtitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Sign in with your Nigerian phone number and password."
+    AppLanguage.PIDGIN -> "Enter with your Nigeria phone number and password."
+  }
+
+  fun forgotPasswordLink(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Forgot Password?"
+    AppLanguage.PIDGIN -> "You Forget Password?"
+  }
+
+  fun dontHaveAccountPrompt(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Don't have an account? Register"
+    AppLanguage.PIDGIN -> "You never get account? Register"
+  }
+
+  // Forgot Password
+  fun forgotPasswordTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Forgot Password"
+    AppLanguage.PIDGIN -> "Forget Password"
+  }
+
+  fun forgotPasswordSubtitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Enter your registered Nigerian phone number to prepare password recovery."
+    AppLanguage.PIDGIN -> "Put the Nigeria phone number wey you take register."
+  }
+
+  fun continueBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Continue"
+    AppLanguage.PIDGIN -> "Continue"
+  }
+
+  fun backToLoginLink(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Back to Login"
+    AppLanguage.PIDGIN -> "Go Back to Login"
+  }
+
+  fun otpBackendPendingNotice(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Password recovery will become available after connecting the secure backend and SMS/OTP verification service. No OTP or verification code has been sent in this frontend stage."
+    AppLanguage.PIDGIN -> "Password recovery go start to work when we connect secure backend and SMS/OTP service. No OTP code don send for this frontend stage."
+  }
+
+  // Validation Errors
+  fun authErrorNameRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Full name is required."
+    AppLanguage.PIDGIN -> "Please write your full name."
+  }
+
+  fun authErrorNameTooShort(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Please enter at least 2 characters for your name."
+    AppLanguage.PIDGIN -> "Make your name reach 2 letters or more."
+  }
+
+  fun authErrorPhoneRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Nigerian phone number is required."
+    AppLanguage.PIDGIN -> "Please put your Nigeria phone number."
+  }
+
+  fun authErrorPhoneInvalid(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Enter a valid Nigerian mobile number (e.g. 0803 123 4567 or +234 803 123 4567)."
+    AppLanguage.PIDGIN -> "Put correct Nigeria phone number (like 0803 123 4567 or +234 803 123 4567)."
+  }
+
+  fun authErrorEmailInvalid(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Please enter a valid email address or leave it blank."
+    AppLanguage.PIDGIN -> "Put correct email address or leave am empty."
+  }
+
+  fun authErrorPasswordRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Password is required."
+    AppLanguage.PIDGIN -> "Please put password."
+  }
+
+  fun authErrorPasswordLength(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Password must be at least 8 characters long."
+    AppLanguage.PIDGIN -> "Password must reach at least 8 characters."
+  }
+
+  fun authErrorConfirmPasswordRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Please confirm your password."
+    AppLanguage.PIDGIN -> "Please write your password again."
+  }
+
+  fun authErrorPasswordMismatch(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Passwords do not match."
+    AppLanguage.PIDGIN -> "The two passwords no match."
+  }
+
+  fun authErrorTermsRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Please accept the Terms and Conditions and Privacy Policy to continue."
+    AppLanguage.PIDGIN -> "Please tick the Terms and Conditions box before you continue."
+  }
+
+  fun authErrorRoleRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Please select either Tenant or Landlord account type."
+    AppLanguage.PIDGIN -> "Please pick Tenant or Landlord account type."
+  }
+
+  // Honest Demonstration Notices
+  fun demoAuthBannerText(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Demonstration UI Mode: Real authentication, password hashing, duplicate-phone checks, and SMS/OTP verification will be connected in the backend stage."
+    AppLanguage.PIDGIN -> "Demo UI Mode: Real login, password security, duplicate-number check, and OTP go connect when backend ready."
+  }
+
+  fun registrationDemoDialogTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Frontend Registration Preview"
+    AppLanguage.PIDGIN -> "Registration Form Preview"
+  }
+
+  fun registrationDemoDialogBody(lang: AppLanguage, normalizedPhone: String): String = when (lang) {
+    AppLanguage.ENGLISH -> "Your inputs passed frontend validation (Normalized phone: $normalizedPhone).\n\nImportant: No real account has been created and your password was NOT stored. Real account creation, duplicate phone number checks, and OTP verification require backend integration."
+    AppLanguage.PIDGIN -> "Your form details pass validation (Phone: $normalizedPhone).\n\nImportant: Real account never create yet and we no save your password. Real account creation and OTP go work when backend connect."
+  }
+
+  fun loginDemoDialogTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Frontend Login Preview"
+    AppLanguage.PIDGIN -> "Login Form Preview"
+  }
+
+  fun loginDemoDialogBody(lang: AppLanguage, normalizedPhone: String): String = when (lang) {
+    AppLanguage.ENGLISH -> "Phone ($normalizedPhone) and password format passed frontend validation.\n\nImportant: You are NOT authenticated yet because real authentication requires backend integration. Choose a role below to preview the post-login navigation."
+    AppLanguage.PIDGIN -> "Phone ($normalizedPhone) and password format pass validation.\n\nImportant: Real authentication never happen yet until backend connect. Pick role below to test navigation."
+  }
+
+  fun roleRestrictedTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Role Access Notice"
+    AppLanguage.PIDGIN -> "Account Role Notice"
+  }
+
+  fun roleRestrictedTenantToLandlord(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "This section is for Landlord accounts only. Tenants cannot access landlord property management or listing screens."
+    AppLanguage.PIDGIN -> "Na only Landlord account fit open this place. Tenant no fit enter landlord dashboard or post house."
+  }
+
+  fun roleRestrictedLandlordToTenant(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "You are currently previewing a Landlord account. Switch to Tenant in Profile or Login as a Tenant to browse tenant search screens."
+    AppLanguage.PIDGIN -> "You dey use Landlord account now. Change to Tenant for Profile if you wan find house."
+  }
 }
