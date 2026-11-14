@@ -582,6 +582,16 @@ object DwelloStrings {
     AppLanguage.PIDGIN -> "Find house wey dey available or put your own house for Dwello Homes."
   }
 
+  fun welcomeTagline(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Benin City Property Rental"
+    AppLanguage.PIDGIN -> "Benin City Property Rental"
+  }
+
+  fun welcomeLocationLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Benin City, Edo State"
+    AppLanguage.PIDGIN -> "Benin City, Edo State"
+  }
+
   fun getStartedBtn(lang: AppLanguage): String = when (lang) {
     AppLanguage.ENGLISH -> "Get Started"
     AppLanguage.PIDGIN -> "Start Now"
@@ -590,16 +600,6 @@ object DwelloStrings {
   fun loginBtn(lang: AppLanguage): String = when (lang) {
     AppLanguage.ENGLISH -> "Login"
     AppLanguage.PIDGIN -> "Login"
-  }
-
-  fun welcomeDemoBadge(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Benin City, Edo State • Tenant & Landlord Platform"
-    AppLanguage.PIDGIN -> "Benin City, Edo State • For Tenants & Landlords"
-  }
-
-  fun continueDemoGuest(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Browse Houses in Demo Preview →"
-    AppLanguage.PIDGIN -> "Check Houses for Demo Preview →"
   }
 
   // Account Type Selection
@@ -646,11 +646,6 @@ object DwelloStrings {
   fun continueToRegistrationBtn(lang: AppLanguage): String = when (lang) {
     AppLanguage.ENGLISH -> "Continue to Registration"
     AppLanguage.PIDGIN -> "Continue to Register"
-  }
-
-  fun noAgentNotice(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Dwello Homes connects Tenants and Landlords directly. There is no Agent role on this platform."
-    AppLanguage.PIDGIN -> "Dwello Homes dey connect Tenants and Landlords direct. No Agent account dey here."
   }
 
   // Registration
@@ -869,12 +864,17 @@ object DwelloStrings {
   }
 
   fun roleRestrictedTenantToLandlord(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "This section is for Landlord accounts only. Tenants cannot access landlord property management or listing screens."
-    AppLanguage.PIDGIN -> "Na only Landlord account fit open this place. Tenant no fit enter landlord dashboard or post house."
+    AppLanguage.ENGLISH -> "You are signed in with a Tenant account. Landlord property management and listing screens are only available to Landlord accounts. You can switch your role or account from Profile."
+    AppLanguage.PIDGIN -> "You dey use Tenant account now. Na only Landlord account fit open property management and post house screens. You fit change role or account for Profile."
   }
 
   fun roleRestrictedLandlordToTenant(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "You are currently previewing a Landlord account. Switch to Tenant in Profile or Login as a Tenant to browse tenant search screens."
-    AppLanguage.PIDGIN -> "You dey use Landlord account now. Change to Tenant for Profile if you wan find house."
+    AppLanguage.ENGLISH -> "You are signed in with a Landlord account. Tenant property search is only available to Tenant accounts. You can switch to a Tenant role in Profile if you want to browse available houses."
+    AppLanguage.PIDGIN -> "You dey use Landlord account now. Na only Tenant account fit search houses. You fit change to Tenant for Profile if you wan find house."
+  }
+
+  fun logoutToWelcomeBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Log Out (Welcome / Login)"
+    AppLanguage.PIDGIN -> "Comot (Welcome / Login)"
   }
 }

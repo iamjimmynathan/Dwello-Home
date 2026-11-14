@@ -362,16 +362,58 @@ class ExampleUnitTest {
   }
 
   @Test
+  fun testUnauthenticatedUsersAreBlockedFromPropertiesDetailsEnquiriesAndDashboards() {
+    // Unauthenticated users (role == null) may ONLY access Auth screens
+    assertTrue(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.WELCOME))
+    assertTrue(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.ACCOUNT_TYPE_SELECTION))
+    assertTrue(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.REGISTRATION))
+    assertTrue(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.LOGIN))
+    assertTrue(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.FORGOT_PASSWORD))
+
+    // Unauthenticated users cannot access Home, Find Houses, Messages, Profile, Post House, or Landlord Dashboard
+    assertFalse(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.HOME))
+    assertFalse(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.FIND_HOUSES))
+    assertFalse(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.MESSAGES))
+    assertFalse(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.PROFILE))
+    assertFalse(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.POST_HOUSE))
+    assertFalse(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.LANDLORD_DASHBOARD))
+
+    // Unauthenticated users cannot browse houses, view property details, submit enquiries, or manage properties
+    assertFalse(RoleNavigationRouter.canBrowseApprovedProperties(null))
+    assertFalse(RoleNavigationRouter.canAccessPropertyDetails(null))
+    assertFalse(RoleNavigationRouter.canSubmitPropertyEnquiry(null))
+    assertFalse(RoleNavigationRouter.canAccessLandlordManagement(null))
+
+    // Any unauthenticated navigation attempt to a protected route redirects to WELCOME
+    assertEquals(
+      DwelloNavScreen.WELCOME,
+      RoleNavigationRouter.redirectUnauthenticatedTarget(null, DwelloNavScreen.FIND_HOUSES)
+    )
+    assertEquals(
+      DwelloNavScreen.WELCOME,
+      RoleNavigationRouter.redirectUnauthenticatedTarget(null, DwelloNavScreen.HOME)
+    )
+    assertEquals(
+      DwelloNavScreen.WELCOME,
+      RoleNavigationRouter.redirectUnauthenticatedTarget(null, DwelloNavScreen.LANDLORD_DASHBOARD)
+    )
+  }
+
+  @Test
   fun testRoleBasedPostLoginRoutingAndAccessGuards() {
     // Post-login destinations
     assertEquals(DwelloNavScreen.HOME, RoleNavigationRouter.postLoginDestination(AuthAccountRole.TENANT))
     assertEquals(DwelloNavScreen.LANDLORD_DASHBOARD, RoleNavigationRouter.postLoginDestination(AuthAccountRole.LANDLORD))
 
-    // Tenant restrictions
+    // Tenant access & capabilities
     assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.HOME))
     assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.FIND_HOUSES))
     assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.MESSAGES))
     assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.PROFILE))
+    assertTrue(RoleNavigationRouter.canBrowseApprovedProperties(AuthAccountRole.TENANT))
+    assertTrue(RoleNavigationRouter.canAccessPropertyDetails(AuthAccountRole.TENANT))
+    assertTrue(RoleNavigationRouter.canSubmitPropertyEnquiry(AuthAccountRole.TENANT))
+    assertFalse(RoleNavigationRouter.canAccessLandlordManagement(AuthAccountRole.TENANT))
     assertFalse(
       "Tenants must NOT access Landlord Dashboard",
       RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.LANDLORD_DASHBOARD)
@@ -381,11 +423,19 @@ class ExampleUnitTest {
       RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.POST_HOUSE)
     )
 
-    // Landlord restrictions
+    // Tenant approved & available properties check
+    val tenantSearchList = SamplePropertyData.getApprovedPublicProperties()
+    assertTrue(tenantSearchList.isNotEmpty())
+    assertTrue(tenantSearchList.all { it.approvalStatus == PropertyApprovalStatus.APPROVED })
+    assertFalse(tenantSearchList.any { it.approvalStatus == PropertyApprovalStatus.UNAVAILABLE })
+
+    // Landlord access & capabilities
     assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.LANDLORD_DASHBOARD))
     assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.POST_HOUSE))
     assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.MESSAGES))
     assertTrue(RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.PROFILE))
+    assertTrue(RoleNavigationRouter.canAccessLandlordManagement(AuthAccountRole.LANDLORD))
+    assertFalse(RoleNavigationRouter.canBrowseApprovedProperties(AuthAccountRole.LANDLORD))
     assertFalse(
       "Landlords must NOT access Tenant Home without switching role",
       RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.HOME)

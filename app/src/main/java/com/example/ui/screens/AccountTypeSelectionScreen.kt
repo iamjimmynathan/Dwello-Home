@@ -25,7 +25,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AddHome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -137,36 +136,6 @@ fun AccountTypeSelectionScreen(
         onClick = { selectedRole = AuthAccountRole.LANDLORD },
         testTag = "account_type_landlord_card"
       )
-
-      Spacer(modifier = Modifier.height(20.dp))
-
-      // Direct Tenant-Landlord intermediary notice (no Agent role)
-      Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = VeryLightBlueBackground,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, SoftBlueBorder)
-      ) {
-        Row(
-          modifier = Modifier.padding(14.dp),
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Icon(
-            imageVector = Icons.Default.Info,
-            contentDescription = null,
-            tint = SkyBluePrimary,
-            modifier = Modifier.size(20.dp)
-          )
-          Spacer(modifier = Modifier.width(10.dp))
-          Text(
-            text = DwelloStrings.noAgentNotice(currentLanguage),
-            style = MaterialTheme.typography.bodySmall.copy(
-              color = DeepNavyText,
-              lineHeight = 18.sp
-            )
-          )
-        }
-      }
 
       Spacer(modifier = Modifier.height(28.dp))
 

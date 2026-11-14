@@ -96,17 +96,17 @@ fun DwelloApp() {
   var currentScreen by remember { mutableStateOf(DwelloNavScreen.WELCOME) }
   var currentLanguage by remember { mutableStateOf(AppLanguage.ENGLISH) }
   var initialSearchQuery by remember { mutableStateOf<String?>(null) }
-  var activeRole by remember { mutableStateOf(AuthAccountRole.TENANT) }
+  var authenticatedRole by remember { mutableStateOf<AuthAccountRole?>(null) }
   var selectedRegistrationRole by remember { mutableStateOf(AuthAccountRole.TENANT) }
   var roleRestrictedTarget by remember { mutableStateOf<DwelloNavScreen?>(null) }
 
-  val isAuthScreen = currentScreen == DwelloNavScreen.WELCOME ||
-    currentScreen == DwelloNavScreen.ACCOUNT_TYPE_SELECTION ||
-    currentScreen == DwelloNavScreen.REGISTRATION ||
-    currentScreen == DwelloNavScreen.LOGIN ||
-    currentScreen == DwelloNavScreen.FORGOT_PASSWORD
-
-  val roleHomeScreen = RoleNavigationRouter.postLoginDestination(activeRole)
+  val effectiveScreen = RoleNavigationRouter.redirectUnauthenticatedTarget(
+    role = authenticatedRole,
+    requestedScreen = currentScreen
+  )
+  val isAuthScreen = RoleNavigationRouter.isAuthScreen(effectiveScreen)
+  val roleHomeScreen = authenticatedRole?.let { RoleNavigationRouter.postLoginDestination(it) }
+    ?: DwelloNavScreen.WELCOME
 
   fun toggleLanguage() {
     currentLanguage = if (currentLanguage == AppLanguage.ENGLISH) {
@@ -117,7 +117,14 @@ fun DwelloApp() {
   }
 
   fun navigateWithRoleGuard(target: DwelloNavScreen) {
-    if (RoleNavigationRouter.canAccessScreen(activeRole, target)) {
+    val role = authenticatedRole
+    if (role == null && !RoleNavigationRouter.isAuthScreen(target)) {
+      roleRestrictedTarget = null
+      currentScreen = DwelloNavScreen.WELCOME
+      return
+    }
+    if (RoleNavigationRouter.canAccessScreen(role, target)) {
+      roleRestrictedTarget = null
       currentScreen = target
     } else {
       roleRestrictedTarget = target
@@ -125,9 +132,9 @@ fun DwelloApp() {
   }
 
   // Handle system back navigation for secondary main app screens (auth screens manage their own backstack)
-  if (!isAuthScreen && currentScreen != roleHomeScreen) {
+  if (!isAuthScreen && effectiveScreen != roleHomeScreen) {
     BackHandler {
-      currentScreen = if (currentScreen == DwelloNavScreen.POST_HOUSE && activeRole == AuthAccountRole.LANDLORD) {
+      currentScreen = if (effectiveScreen == DwelloNavScreen.POST_HOUSE && authenticatedRole == AuthAccountRole.LANDLORD) {
         DwelloNavScreen.LANDLORD_DASHBOARD
       } else {
         roleHomeScreen
@@ -138,15 +145,15 @@ fun DwelloApp() {
   Scaffold(
     modifier = Modifier.fillMaxSize(),
     bottomBar = {
-      if (!isAuthScreen) {
+      if (!isAuthScreen && authenticatedRole != null) {
         NavigationBar(
           containerColor = Color.White,
           contentColor = DeepNavyText,
           tonalElevation = 6.dp,
           modifier = Modifier.testTag("bottom_nav_bar")
         ) {
-          // 1. Home
-          val isHome = currentScreen == DwelloNavScreen.HOME
+          // 1. Home (Tenant)
+          val isHome = effectiveScreen == DwelloNavScreen.HOME
           NavigationBarItem(
             selected = isHome,
             onClick = { navigateWithRoleGuard(DwelloNavScreen.HOME) },
@@ -176,8 +183,8 @@ fun DwelloApp() {
             modifier = Modifier.testTag("nav_item_home")
           )
 
-          // 2. Find Houses
-          val isFind = currentScreen == DwelloNavScreen.FIND_HOUSES
+          // 2. Find Houses (Tenant)
+          val isFind = effectiveScreen == DwelloNavScreen.FIND_HOUSES
           NavigationBarItem(
             selected = isFind,
             onClick = {
@@ -210,8 +217,8 @@ fun DwelloApp() {
             modifier = Modifier.testTag("nav_item_find_houses")
           )
 
-          // 3. Post House (Landlord only)
-          val isPost = currentScreen == DwelloNavScreen.POST_HOUSE
+          // 3. Post House (Landlord)
+          val isPost = effectiveScreen == DwelloNavScreen.POST_HOUSE
           NavigationBarItem(
             selected = isPost,
             onClick = { navigateWithRoleGuard(DwelloNavScreen.POST_HOUSE) },
@@ -242,7 +249,7 @@ fun DwelloApp() {
           )
 
           // 4. Messages (Shared)
-          val isMessages = currentScreen == DwelloNavScreen.MESSAGES
+          val isMessages = effectiveScreen == DwelloNavScreen.MESSAGES
           NavigationBarItem(
             selected = isMessages,
             onClick = { navigateWithRoleGuard(DwelloNavScreen.MESSAGES) },
@@ -273,7 +280,7 @@ fun DwelloApp() {
           )
 
           // 5. Profile / Landlord
-          val isProfile = currentScreen == DwelloNavScreen.PROFILE || currentScreen == DwelloNavScreen.LANDLORD_DASHBOARD
+          val isProfile = effectiveScreen == DwelloNavScreen.PROFILE || effectiveScreen == DwelloNavScreen.LANDLORD_DASHBOARD
           NavigationBarItem(
             selected = isProfile,
             onClick = { navigateWithRoleGuard(DwelloNavScreen.PROFILE) },
@@ -312,17 +319,13 @@ fun DwelloApp() {
         .padding(innerPadding)
         .background(MainBackgroundWhite)
     ) {
-      when (currentScreen) {
+      when (effectiveScreen) {
         DwelloNavScreen.WELCOME -> {
           WelcomeScreen(
             currentLanguage = currentLanguage,
             onLanguageToggle = ::toggleLanguage,
             onGetStartedClick = { currentScreen = DwelloNavScreen.ACCOUNT_TYPE_SELECTION },
-            onLoginClick = { currentScreen = DwelloNavScreen.LOGIN },
-            onBrowseDemoGuestClick = {
-              activeRole = AuthAccountRole.TENANT
-              currentScreen = RoleNavigationRouter.postLoginDestination(AuthAccountRole.TENANT)
-            }
+            onLoginClick = { currentScreen = DwelloNavScreen.LOGIN }
           )
         }
 
@@ -347,7 +350,8 @@ fun DwelloApp() {
             onChangeRoleClick = { currentScreen = DwelloNavScreen.ACCOUNT_TYPE_SELECTION },
             onNavigateToLogin = { currentScreen = DwelloNavScreen.LOGIN },
             onPreviewAuthenticatedRole = { role ->
-              activeRole = role
+              authenticatedRole = role
+              roleRestrictedTarget = null
               currentScreen = RoleNavigationRouter.postLoginDestination(role)
             },
             onBack = { currentScreen = DwelloNavScreen.ACCOUNT_TYPE_SELECTION }
@@ -361,7 +365,8 @@ fun DwelloApp() {
             onForgotPasswordClick = { currentScreen = DwelloNavScreen.FORGOT_PASSWORD },
             onRegisterClick = { currentScreen = DwelloNavScreen.ACCOUNT_TYPE_SELECTION },
             onPreviewAuthenticatedRole = { role ->
-              activeRole = role
+              authenticatedRole = role
+              roleRestrictedTarget = null
               currentScreen = RoleNavigationRouter.postLoginDestination(role)
             },
             onBack = { currentScreen = DwelloNavScreen.WELCOME }
@@ -377,83 +382,104 @@ fun DwelloApp() {
         }
 
         DwelloNavScreen.HOME -> {
-          HomeScreen(
-            currentLanguage = currentLanguage,
-            onLanguageToggle = ::toggleLanguage,
-            onNavigateToFindHouses = { query ->
-              initialSearchQuery = query
-              navigateWithRoleGuard(DwelloNavScreen.FIND_HOUSES)
-            },
-            onNavigateToPostHouse = {
-              navigateWithRoleGuard(DwelloNavScreen.POST_HOUSE)
-            }
-          )
+          if (authenticatedRole == AuthAccountRole.TENANT) {
+            HomeScreen(
+              currentLanguage = currentLanguage,
+              onLanguageToggle = ::toggleLanguage,
+              onNavigateToFindHouses = { query ->
+                initialSearchQuery = query
+                navigateWithRoleGuard(DwelloNavScreen.FIND_HOUSES)
+              },
+              onNavigateToPostHouse = {
+                navigateWithRoleGuard(DwelloNavScreen.POST_HOUSE)
+              }
+            )
+          }
         }
 
         DwelloNavScreen.FIND_HOUSES -> {
-          FindHousesScreen(
-            currentLanguage = currentLanguage,
-            initialSearchQuery = initialSearchQuery,
-            onLanguageToggle = ::toggleLanguage,
-            onOpenMessageWithLandlord = { _ ->
-              navigateWithRoleGuard(DwelloNavScreen.MESSAGES)
-            }
-          )
+          if (authenticatedRole == AuthAccountRole.TENANT) {
+            FindHousesScreen(
+              currentLanguage = currentLanguage,
+              initialSearchQuery = initialSearchQuery,
+              onLanguageToggle = ::toggleLanguage,
+              onOpenMessageWithLandlord = { _ ->
+                navigateWithRoleGuard(DwelloNavScreen.MESSAGES)
+              }
+            )
+          }
         }
 
         DwelloNavScreen.POST_HOUSE -> {
-          PostHouseScreen(
-            currentLanguage = currentLanguage,
-            onLanguageToggle = ::toggleLanguage,
-            onSuccessNavigateHome = {
-              navigateWithRoleGuard(DwelloNavScreen.LANDLORD_DASHBOARD)
-            },
-            onBack = {
-              navigateWithRoleGuard(DwelloNavScreen.LANDLORD_DASHBOARD)
-            }
-          )
+          if (authenticatedRole == AuthAccountRole.LANDLORD) {
+            PostHouseScreen(
+              currentLanguage = currentLanguage,
+              onLanguageToggle = ::toggleLanguage,
+              onSuccessNavigateHome = {
+                navigateWithRoleGuard(DwelloNavScreen.LANDLORD_DASHBOARD)
+              },
+              onBack = {
+                navigateWithRoleGuard(DwelloNavScreen.LANDLORD_DASHBOARD)
+              }
+            )
+          }
         }
 
         DwelloNavScreen.MESSAGES -> {
-          MessagesScreen(
-            currentLanguage = currentLanguage,
-            onLanguageToggle = ::toggleLanguage
-          )
+          if (authenticatedRole != null) {
+            MessagesScreen(
+              currentLanguage = currentLanguage,
+              onLanguageToggle = ::toggleLanguage
+            )
+          }
         }
 
         DwelloNavScreen.PROFILE -> {
-          ProfileScreen(
-            currentLanguage = currentLanguage,
-            onLanguageSelected = { newLang -> currentLanguage = newLang },
-            onLanguageToggle = ::toggleLanguage,
-            activeRole = activeRole,
-            onRoleChange = { newRole -> activeRole = newRole },
-            onOpenWelcomeAuth = { currentScreen = DwelloNavScreen.WELCOME },
-            onNavigateToLandlordDashboard = {
-              navigateWithRoleGuard(DwelloNavScreen.LANDLORD_DASHBOARD)
-            }
-          )
+          val activeRole = authenticatedRole
+          if (activeRole != null) {
+            ProfileScreen(
+              currentLanguage = currentLanguage,
+              onLanguageSelected = { newLang -> currentLanguage = newLang },
+              onLanguageToggle = ::toggleLanguage,
+              activeRole = activeRole,
+              onRoleChange = { newRole ->
+                authenticatedRole = newRole
+                roleRestrictedTarget = null
+              },
+              onOpenWelcomeAuth = {
+                authenticatedRole = null
+                roleRestrictedTarget = null
+                currentScreen = DwelloNavScreen.WELCOME
+              },
+              onNavigateToLandlordDashboard = {
+                navigateWithRoleGuard(DwelloNavScreen.LANDLORD_DASHBOARD)
+              }
+            )
+          }
         }
 
         DwelloNavScreen.LANDLORD_DASHBOARD -> {
-          LandlordDashboardScreen(
-            currentLanguage = currentLanguage,
-            onLanguageToggle = ::toggleLanguage,
-            onNavigateToPostHouse = {
-              navigateWithRoleGuard(DwelloNavScreen.POST_HOUSE)
-            },
-            onBackToHome = {
-              currentScreen = DwelloNavScreen.PROFILE
-            }
-          )
+          if (authenticatedRole == AuthAccountRole.LANDLORD) {
+            LandlordDashboardScreen(
+              currentLanguage = currentLanguage,
+              onLanguageToggle = ::toggleLanguage,
+              onNavigateToPostHouse = {
+                navigateWithRoleGuard(DwelloNavScreen.POST_HOUSE)
+              },
+              onBackToHome = {
+                currentScreen = DwelloNavScreen.PROFILE
+              }
+            )
+          }
         }
       }
     }
   }
 
-  // Role-based access restriction notice dialog
-  roleRestrictedTarget?.let { _ ->
-    val isTenantBlocked = activeRole == AuthAccountRole.TENANT
+  // Friendly Role Access Notice dialog (only shown when authenticated user taps a screen disallowed for their role)
+  val currentRole = authenticatedRole
+  if (currentRole != null && roleRestrictedTarget != null) {
+    val isTenantBlocked = currentRole == AuthAccountRole.TENANT
     AlertDialog(
       onDismissRequest = { roleRestrictedTarget = null },
       title = {
@@ -479,7 +505,8 @@ fun DwelloApp() {
             roleRestrictedTarget = null
             currentScreen = DwelloNavScreen.PROFILE
           },
-          colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
+          colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
+          modifier = Modifier.testTag("role_notice_go_to_profile_btn")
         ) {
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH) "Go to Profile" else "Open Profile",
@@ -489,7 +516,10 @@ fun DwelloApp() {
         }
       },
       dismissButton = {
-        TextButton(onClick = { roleRestrictedTarget = null }) {
+        TextButton(
+          onClick = { roleRestrictedTarget = null },
+          modifier = Modifier.testTag("role_notice_close_btn")
+        ) {
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH) "Close" else "Close",
             color = NavyTextSecondary

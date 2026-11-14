@@ -282,10 +282,7 @@ fun ProfileScreen(
           border = BorderStroke(1.5.dp, SkyBluePrimary)
         ) {
           Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH)
-              "Welcome / Login / Registration Screens"
-            else
-              "Open Welcome / Login / Register",
+            text = DwelloStrings.logoutToWelcomeBtn(currentLanguage),
             style = MaterialTheme.typography.labelLarge.copy(
               color = SkyBluePrimary,
               fontWeight = FontWeight.Bold

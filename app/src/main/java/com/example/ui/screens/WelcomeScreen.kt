@@ -3,7 +3,6 @@ package com.example.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +29,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,7 +57,6 @@ fun WelcomeScreen(
   onLanguageToggle: () -> Unit,
   onGetStartedClick: () -> Unit,
   onLoginClick: () -> Unit,
-  onBrowseDemoGuestClick: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   Column(
@@ -84,9 +81,9 @@ fun WelcomeScreen(
       )
     }
 
-    Spacer(modifier = Modifier.height(24.dp))
+    Spacer(modifier = Modifier.height(28.dp))
 
-    // Hero Branding Card
+    // Hero Branding Column
     Column(
       modifier = Modifier
         .fillMaxWidth()
@@ -128,12 +125,24 @@ fun WelcomeScreen(
         modifier = Modifier.testTag("welcome_brand_name")
       )
 
-      Spacer(modifier = Modifier.height(10.dp))
+      Spacer(modifier = Modifier.height(4.dp))
+
+      Text(
+        text = DwelloStrings.welcomeTagline(currentLanguage),
+        style = MaterialTheme.typography.titleSmall.copy(
+          fontWeight = FontWeight.SemiBold,
+          color = NavyTextSecondary
+        ),
+        modifier = Modifier.testTag("welcome_tagline")
+      )
+
+      Spacer(modifier = Modifier.height(12.dp))
 
       Surface(
         color = VeryLightBlueBackground,
         shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, SoftBlueBorder)
+        border = BorderStroke(1.dp, SoftBlueBorder),
+        modifier = Modifier.testTag("welcome_location_badge")
       ) {
         Row(
           modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
@@ -147,7 +156,7 @@ fun WelcomeScreen(
           )
           Spacer(modifier = Modifier.width(6.dp))
           Text(
-            text = DwelloStrings.welcomeDemoBadge(currentLanguage),
+            text = DwelloStrings.welcomeLocationLabel(currentLanguage),
             style = MaterialTheme.typography.labelMedium.copy(
               color = DeepNavyText,
               fontWeight = FontWeight.SemiBold
@@ -156,9 +165,9 @@ fun WelcomeScreen(
         }
       }
 
-      Spacer(modifier = Modifier.height(28.dp))
+      Spacer(modifier = Modifier.height(30.dp))
 
-      // Heading & Supporting Text
+      // Heading & Supporting Description
       Text(
         text = DwelloStrings.welcomeHeading(currentLanguage),
         style = MaterialTheme.typography.headlineLarge.copy(
@@ -179,10 +188,12 @@ fun WelcomeScreen(
           lineHeight = 24.sp
         ),
         textAlign = TextAlign.Center,
-        modifier = Modifier.padding(horizontal = 8.dp)
+        modifier = Modifier
+          .padding(horizontal = 8.dp)
+          .testTag("welcome_supporting_text")
       )
 
-      Spacer(modifier = Modifier.height(36.dp))
+      Spacer(modifier = Modifier.height(38.dp))
 
       // Get Started Button (Primary Sky Blue)
       Button(
@@ -246,45 +257,7 @@ fun WelcomeScreen(
         )
       }
 
-      Spacer(modifier = Modifier.height(18.dp))
-
-      // Direct Demo Preview Entry
-      TextButton(
-        onClick = onBrowseDemoGuestClick,
-        modifier = Modifier
-          .height(48.dp)
-          .testTag("welcome_demo_preview_button")
-      ) {
-        Text(
-          text = DwelloStrings.continueDemoGuest(currentLanguage),
-          style = MaterialTheme.typography.bodyMedium.copy(
-            color = NavyTextSecondary,
-            fontWeight = FontWeight.SemiBold
-          )
-        )
-      }
-
-      Spacer(modifier = Modifier.height(16.dp))
-
-      // Simple reassurance footer
-      Box(
-        modifier = Modifier
-          .fillMaxWidth()
-          .clip(RoundedCornerShape(12.dp))
-          .background(VeryLightBlueBackground)
-          .border(1.dp, SoftBlueBorder, RoundedCornerShape(12.dp))
-          .padding(14.dp)
-      ) {
-        Text(
-          text = DwelloStrings.noAgentNotice(currentLanguage),
-          style = MaterialTheme.typography.bodySmall.copy(
-            color = DeepNavyText,
-            lineHeight = 18.sp
-          ),
-          textAlign = TextAlign.Center,
-          modifier = Modifier.fillMaxWidth()
-        )
-      }
+      Spacer(modifier = Modifier.height(20.dp))
     }
   }
 }
