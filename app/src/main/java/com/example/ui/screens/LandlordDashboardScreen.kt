@@ -1,9 +1,7 @@
 package com.example.ui.screens
 
-import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,7 +25,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddHome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
@@ -35,8 +32,6 @@ import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.PublishedWithChanges
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
@@ -47,6 +42,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,7 +54,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,13 +69,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.data.AppLanguage
+import com.example.data.AuthenticatedUser
 import com.example.data.DwelloStrings
 import com.example.data.EnquiryItem
-import com.example.data.EnquiryRepository
+import com.example.data.EnquiryStatus
 import com.example.data.PropertyApprovalStatus
 import com.example.data.PropertyItem
-import com.example.data.SamplePropertyData
+import com.example.data.RentalPeriod
+import com.example.data.calculateLandlordStats
+import com.example.ui.AsyncResourceState
 import com.example.ui.components.DwelloHeader
 import com.example.ui.theme.CardBorderSubtle
 import com.example.ui.theme.CardSurfaceWhite
@@ -104,31 +103,47 @@ enum class LandlordPropertyFilter {
 @Composable
 fun LandlordDashboardScreen(
   currentLanguage: AppLanguage,
+  currentUser: AuthenticatedUser?,
+  propertiesState: AsyncResourceState<List<PropertyItem>>,
+  enquiriesState: AsyncResourceState<List<EnquiryItem>>,
+  isActionLoading: Boolean,
+  actionMessage: String?,
+  actionError: String?,
   onLanguageToggle: () -> Unit,
+  onRetryLoad: () -> Unit,
   onNavigateToPostHouse: () -> Unit,
+  onUpdateListing: (
+    propertyId: String,
+    title: String,
+    rentAmount: Long,
+    neighbourhood: String,
+    description: String,
+    fullAddress: String?,
+    landmark: String?
+  ) -> Unit,
+  onToggleAvailability: (PropertyItem) -> Unit,
+  onUpdateEnquiryStatus: (enquiryId: String, status: EnquiryStatus) -> Unit,
+  onClearFeedback: () -> Unit,
   onBackToHome: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   var selectedFilter by remember { mutableStateOf(LandlordPropertyFilter.ALL) }
   var propertyToEdit by remember { mutableStateOf<PropertyItem?>(null) }
   var showEnquiriesDialog by remember { mutableStateOf(false) }
-  var actionFeedbackMessage by remember { mutableStateOf<String?>(null) }
 
-  // Derive stats dynamically from repository
-  val landlordStats by remember {
-    derivedStateOf {
-      SamplePropertyData.getLandlordStats(SamplePropertyData.CURRENT_LANDLORD_NAME)
-    }
+  val landlordProperties = when (propertiesState) {
+    is AsyncResourceState.Success -> propertiesState.data
+    else -> emptyList()
+  }
+  val landlordEnquiries = when (enquiriesState) {
+    is AsyncResourceState.Success -> enquiriesState.data
+    else -> emptyList()
   }
 
-  // Derive properties for current landlord
-  val landlordProperties by remember {
-    derivedStateOf {
-      SamplePropertyData.getLandlordProperties(SamplePropertyData.CURRENT_LANDLORD_NAME)
-    }
+  val landlordStats = remember(landlordProperties, landlordEnquiries) {
+    calculateLandlordStats(landlordProperties, landlordEnquiries)
   }
 
-  // Filter properties
   val filteredProperties = remember(landlordProperties, selectedFilter) {
     when (selectedFilter) {
       LandlordPropertyFilter.ALL -> landlordProperties
@@ -144,7 +159,6 @@ fun LandlordDashboardScreen(
       .fillMaxSize()
       .background(MainBackgroundWhite)
   ) {
-    // 1. App Header with Language Switch
     DwelloHeader(
       currentLanguage = currentLanguage,
       onLanguageToggle = onLanguageToggle
@@ -156,7 +170,7 @@ fun LandlordDashboardScreen(
         .testTag("landlord_dashboard_scroll"),
       contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)
     ) {
-      // 2. Top Title Bar with Back Button & Landlord Info
+      // Top Title Bar with Landlord Info & Refresh button
       item {
         Row(
           modifier = Modifier.fillMaxWidth(),
@@ -165,7 +179,9 @@ fun LandlordDashboardScreen(
         ) {
           Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable(onClick = onBackToHome)
+            modifier = Modifier
+              .weight(1f)
+              .clickable(onClick = onBackToHome)
           ) {
             Icon(
               imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -183,33 +199,45 @@ fun LandlordDashboardScreen(
                 )
               )
               Text(
-                text = "Welcome, ${SamplePropertyData.CURRENT_LANDLORD_NAME} • Benin City",
+                text = "Welcome, ${currentUser?.fullName ?: "Landlord"} • Benin City",
                 style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
               )
             }
           }
 
-          Surface(
-            color = SoftBlueAccent,
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, SoftBlueBorder)
-          ) {
-            Text(
-              text = "LANDLORD",
-              modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-              style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.Bold,
-                color = SkyBluePrimary,
-                fontSize = 11.sp
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+              onClick = onRetryLoad,
+              modifier = Modifier.testTag("landlord_refresh_button")
+            ) {
+              Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Refresh dashboard",
+                tint = SkyBluePrimary
               )
-            )
+            }
+            Surface(
+              color = SoftBlueAccent,
+              shape = RoundedCornerShape(8.dp),
+              border = BorderStroke(1.dp, SoftBlueBorder)
+            ) {
+              Text(
+                text = "LANDLORD",
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelSmall.copy(
+                  fontWeight = FontWeight.Bold,
+                  color = SkyBluePrimary,
+                  fontSize = 11.sp
+                )
+              )
+            }
           }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
       }
 
-      // 3. Privacy & Phone Protection Notice
+      // Privacy & Phone Protection Notice
       item {
         Card(
           modifier = Modifier.fillMaxWidth(),
@@ -242,7 +270,7 @@ fun LandlordDashboardScreen(
         Spacer(modifier = Modifier.height(16.dp))
       }
 
-      // 4. Dashboard Statistics Grid / Cards
+      // Dashboard Statistics Grid / Cards
       item {
         Text(
           text = if (currentLanguage == AppLanguage.ENGLISH) "Portfolio Statistics" else "House Summary Stats",
@@ -253,12 +281,10 @@ fun LandlordDashboardScreen(
         )
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Row 1: Total, Approved, Pending
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-          // Total Properties
           DashboardStatCard(
             title = DwelloStrings.statTotalProperties(currentLanguage),
             count = landlordStats.totalProperties.toString(),
@@ -268,7 +294,6 @@ fun LandlordDashboardScreen(
             testTag = "stat_total_properties"
           )
 
-          // Approved & Live
           DashboardStatCard(
             title = DwelloStrings.statApprovedProperties(currentLanguage),
             count = landlordStats.approvedCount.toString(),
@@ -278,7 +303,6 @@ fun LandlordDashboardScreen(
             testTag = "stat_approved_properties"
           )
 
-          // Pending Approval
           DashboardStatCard(
             title = DwelloStrings.statPendingApproval(currentLanguage),
             count = landlordStats.pendingCount.toString(),
@@ -291,12 +315,10 @@ fun LandlordDashboardScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Row 2: Rejected, New Enquiries
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-          // Rejected
           DashboardStatCard(
             title = DwelloStrings.statRejectedProperties(currentLanguage),
             count = landlordStats.rejectedCount.toString(),
@@ -306,7 +328,6 @@ fun LandlordDashboardScreen(
             testTag = "stat_rejected_properties"
           )
 
-          // New Enquiries (Clickable to view details)
           DashboardStatCard(
             title = DwelloStrings.statNewEnquiries(currentLanguage),
             count = landlordStats.newEnquiriesCount.toString(),
@@ -322,7 +343,7 @@ fun LandlordDashboardScreen(
         Spacer(modifier = Modifier.height(20.dp))
       }
 
-      // 5. PROMINENT "ADD NEW PROPERTY" BUTTON (Sky Blue #168BE8)
+      // PROMINENT "ADD NEW PROPERTY" BUTTON
       item {
         Button(
           onClick = onNavigateToPostHouse,
@@ -370,7 +391,7 @@ fun LandlordDashboardScreen(
         Spacer(modifier = Modifier.height(22.dp))
       }
 
-      // 6. Section Heading: My Properties & Filter Chips
+      // Section Heading: My Properties & Filter Chips
       item {
         Row(
           modifier = Modifier.fillMaxWidth(),
@@ -394,12 +415,11 @@ fun LandlordDashboardScreen(
         }
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Filter Pills Row
         LazyRow(
           horizontalArrangement = Arrangement.spacedBy(8.dp),
           contentPadding = PaddingValues(vertical = 4.dp)
         ) {
-          items(LandlordPropertyFilter.values()) { filter ->
+          items(LandlordPropertyFilter.entries.toTypedArray()) { filter ->
             val isSelected = selectedFilter == filter
             val label = when (filter) {
               LandlordPropertyFilter.ALL -> "${DwelloStrings.filterAll(currentLanguage)} (${landlordProperties.size})"
@@ -433,76 +453,157 @@ fun LandlordDashboardScreen(
         Spacer(modifier = Modifier.height(12.dp))
       }
 
-      // 7. My Properties List
-      if (filteredProperties.isEmpty()) {
-        item {
-          Card(
-            modifier = Modifier
-              .fillMaxWidth()
-              .padding(vertical = 20.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
-            border = BorderStroke(1.dp, SoftBlueBorder)
-          ) {
-            Column(
+      // My Properties List / Loading / Error / Empty
+      when (propertiesState) {
+        is AsyncResourceState.Idle,
+        is AsyncResourceState.Loading -> {
+          item {
+            Card(
               modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
-              horizontalAlignment = Alignment.CenterHorizontally
+                .padding(vertical = 12.dp)
+                .testTag("landlord_properties_loading"),
+              shape = RoundedCornerShape(14.dp),
+              colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
+              border = BorderStroke(1.dp, SoftBlueBorder)
             ) {
-              Icon(
-                imageVector = Icons.Default.Info,
-                contentDescription = null,
-                tint = NavyTextSecondary,
-                modifier = Modifier.size(36.dp)
-              )
-              Spacer(modifier = Modifier.height(8.dp))
-              Text(
-                text = if (currentLanguage == AppLanguage.ENGLISH)
-                  "No properties found in this category"
-                else
-                  "No house found for this category",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                  fontWeight = FontWeight.SemiBold,
-                  color = DeepNavyText
-                )
-              )
-              Spacer(modifier = Modifier.height(12.dp))
-              OutlinedButton(
-                onClick = { selectedFilter = LandlordPropertyFilter.ALL },
-                border = BorderStroke(1.dp, SkyBluePrimary)
+              Column(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
               ) {
-                Text("Show All Properties", color = SkyBluePrimary)
+                CircularProgressIndicator(color = SkyBluePrimary)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                  text = "Loading your properties...",
+                  style = MaterialTheme.typography.bodyMedium.copy(
+                    color = DeepNavyText,
+                    fontWeight = FontWeight.SemiBold
+                  )
+                )
               }
             }
           }
         }
-      } else {
-        items(filteredProperties) { property ->
-          LandlordPropertyCard(
-            property = property,
-            currentLanguage = currentLanguage,
-            onEditClick = { propertyToEdit = property },
-            onToggleAvailability = {
-              val newStatus = SamplePropertyData.toggleListingAvailability(property.id)
-              actionFeedbackMessage = if (newStatus == PropertyApprovalStatus.UNAVAILABLE) {
-                "Property marked as Unavailable and hidden from tenant searches."
-              } else {
-                "Property marked as Available."
+
+        is AsyncResourceState.Error -> {
+          item {
+            Card(
+              modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp)
+                .testTag("landlord_properties_error"),
+              shape = RoundedCornerShape(14.dp),
+              colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+              border = BorderStroke(1.dp, Color(0xFFFECACA))
+            ) {
+              Column(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+              ) {
+                Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFDC2626), modifier = Modifier.size(32.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                  text = propertiesState.message,
+                  style = MaterialTheme.typography.bodyMedium.copy(
+                    color = Color(0xFF991B1B),
+                    fontWeight = FontWeight.Medium
+                  )
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                  onClick = onRetryLoad,
+                  colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
+                  modifier = Modifier.testTag("landlord_retry_button")
+                ) {
+                  Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(DwelloStrings.retryLabel(currentLanguage))
+                }
               }
-            },
-            onResubmitClick = {
-              val success = SamplePropertyData.resubmitRejectedProperty(property.id)
-              if (success) {
-                actionFeedbackMessage = "Property resubmitted for Dwello Homes verification."
+            }
+          }
+        }
+
+        is AsyncResourceState.Success -> {
+          if (filteredProperties.isEmpty()) {
+            item {
+              Card(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(vertical = 20.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
+                border = BorderStroke(1.dp, SoftBlueBorder)
+              ) {
+                Column(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = NavyTextSecondary,
+                    modifier = Modifier.size(36.dp)
+                  )
+                  Spacer(modifier = Modifier.height(8.dp))
+                  Text(
+                    text = if (landlordProperties.isEmpty()) {
+                      if (currentLanguage == AppLanguage.ENGLISH)
+                        "You haven't posted any properties yet."
+                      else
+                        "You never post any house yet."
+                    } else {
+                      if (currentLanguage == AppLanguage.ENGLISH)
+                        "No properties found in this category"
+                      else
+                        "No house found for this category"
+                    },
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                      fontWeight = FontWeight.SemiBold,
+                      color = DeepNavyText
+                    )
+                  )
+                  Spacer(modifier = Modifier.height(12.dp))
+                  if (landlordProperties.isEmpty()) {
+                    Button(
+                      onClick = onNavigateToPostHouse,
+                      colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
+                    ) {
+                      Text(DwelloStrings.addNewPropertyButton(currentLanguage), fontWeight = FontWeight.Bold)
+                    }
+                  } else {
+                    OutlinedButton(
+                      onClick = { selectedFilter = LandlordPropertyFilter.ALL },
+                      border = BorderStroke(1.dp, SkyBluePrimary)
+                    ) {
+                      Text("Show All Properties", color = SkyBluePrimary)
+                    }
+                  }
+                }
               }
-            },
-            modifier = Modifier.padding(bottom = 16.dp)
-          )
+            }
+          } else {
+            items(filteredProperties, key = { it.id }) { property ->
+              LandlordPropertyCard(
+                property = property,
+                currentLanguage = currentLanguage,
+                isActionLoading = isActionLoading,
+                onEditClick = { propertyToEdit = property },
+                onToggleAvailability = { onToggleAvailability(property) },
+                modifier = Modifier.padding(bottom = 16.dp)
+              )
+            }
+          }
         }
       }
 
-      // 8. Business Rules & Compliance Notice at bottom
+      // Business Rules & Compliance Notice at bottom
       item {
         Spacer(modifier = Modifier.height(8.dp))
         Card(
@@ -543,55 +644,69 @@ fun LandlordDashboardScreen(
     }
   }
 
-  // Edit Listing Dialog
+  // Edit Listing Dialog (PATCH /api/properties/{id})
   propertyToEdit?.let { prop ->
     EditPropertyDialog(
       property = prop,
       currentLanguage = currentLanguage,
+      isSaving = isActionLoading,
       onDismiss = { propertyToEdit = null },
-      onSave = { updatedTitle, updatedPrice, updatedArea, updatedDesc, updatedTerms ->
-        SamplePropertyData.updatePropertyListing(
-          propertyId = prop.id,
-          newTitle = updatedTitle,
-          newPriceNaira = updatedPrice,
-          newArea = updatedArea,
-          newDescription = updatedDesc,
-          newRentalTerms = updatedTerms
+      onSave = { updatedTitle, updatedPrice, updatedArea, updatedDesc, updatedAddress, updatedLandmark ->
+        onUpdateListing(
+          prop.id,
+          updatedTitle,
+          updatedPrice,
+          updatedArea,
+          updatedDesc,
+          updatedAddress,
+          updatedLandmark
         )
-        actionFeedbackMessage = "Listing updated! Status updated to Under Review."
         propertyToEdit = null
       }
     )
   }
 
-  // Tenant Enquiries View Dialog
+  // Tenant Enquiries View Dialog (GET /api/landlord/enquiries + PATCH /api/landlord/enquiries/{id})
   if (showEnquiriesDialog) {
     LandlordEnquiriesDialog(
       currentLanguage = currentLanguage,
+      enquiriesState = enquiriesState,
+      isActionLoading = isActionLoading,
+      onUpdateStatus = onUpdateEnquiryStatus,
       onDismiss = { showEnquiriesDialog = false }
     )
   }
 
-  // Action Feedback Toast / Alert Dialog
-  actionFeedbackMessage?.let { msg ->
+  // Action Feedback Dialog (success or error)
+  val feedbackMsg = actionError ?: actionMessage
+  if (!feedbackMsg.isNullOrBlank()) {
+    val isErr = actionError != null
     AlertDialog(
-      onDismissRequest = { actionFeedbackMessage = null },
+      onDismissRequest = onClearFeedback,
       icon = {
-        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SkyBluePrimary)
+        Icon(
+          imageVector = if (isErr) Icons.Default.Warning else Icons.Default.CheckCircle,
+          contentDescription = null,
+          tint = if (isErr) Color(0xFFDC2626) else SkyBluePrimary
+        )
       },
       title = {
         Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "Status Updated" else "Update Done",
+          text = if (isErr) {
+            if (currentLanguage == AppLanguage.ENGLISH) "Action Failed" else "Something Wrong"
+          } else {
+            if (currentLanguage == AppLanguage.ENGLISH) "Status Updated" else "Update Done"
+          },
           fontWeight = FontWeight.Bold,
           color = DeepNavyText
         )
       },
       text = {
-        Text(text = msg, style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText))
+        Text(text = feedbackMsg, style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText))
       },
       confirmButton = {
         Button(
-          onClick = { actionFeedbackMessage = null },
+          onClick = onClearFeedback,
           colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
         ) {
           Text("OK")
@@ -654,9 +769,9 @@ fun DashboardStatCard(
 fun LandlordPropertyCard(
   property: PropertyItem,
   currentLanguage: AppLanguage,
+  isActionLoading: Boolean,
   onEditClick: () -> Unit,
   onToggleAvailability: () -> Unit,
-  onResubmitClick: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   Card(
@@ -669,7 +784,6 @@ fun LandlordPropertyCard(
     border = BorderStroke(1.dp, CardBorderSubtle)
   ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-      // 1. Property Image & Approval Status Badge
       Box(
         modifier = Modifier
           .fillMaxWidth()
@@ -677,8 +791,10 @@ fun LandlordPropertyCard(
       ) {
         if (property.photoUris.isNotEmpty()) {
           AsyncImage(
-            model = Uri.parse(property.photoUris.first()),
+            model = property.photoUris.first(),
             contentDescription = property.titleEn,
+            placeholder = painterResource(id = property.imageResId),
+            error = painterResource(id = property.imageResId),
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
           )
@@ -691,7 +807,6 @@ fun LandlordPropertyCard(
           )
         }
 
-        // Status Badge at top right
         val (badgeBg, badgeText, badgeIcon, statusLabel) = when (property.approvalStatus) {
           PropertyApprovalStatus.APPROVED -> Quadruple(
             Color(0xFFE8F5E9),
@@ -749,7 +864,6 @@ fun LandlordPropertyCard(
           }
         }
 
-        // Location Chip on top left
         Surface(
           modifier = Modifier
             .padding(10.dp)
@@ -780,7 +894,6 @@ fun LandlordPropertyCard(
         }
       }
 
-      // 2. Card Content (Title, Price, Location details)
       Column(
         modifier = Modifier
           .fillMaxWidth()
@@ -800,8 +913,9 @@ fun LandlordPropertyCard(
             modifier = Modifier.weight(1f)
           )
 
+          val periodShort = if (property.rentalPeriod == RentalPeriod.MONTHLY) "/ mo" else "/ yr"
           Text(
-            text = "${property.priceFormatted} / yr",
+            text = "${property.priceFormatted} $periodShort",
             style = MaterialTheme.typography.titleMedium.copy(
               fontWeight = FontWeight.ExtraBold,
               color = SkyBluePrimary
@@ -811,11 +925,10 @@ fun LandlordPropertyCard(
 
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-          text = "📍 ${property.neighborhoodNote}, ${property.area}, Benin City",
+          text = "${property.neighborhoodNote}, ${property.area}, Benin City",
           style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
         )
 
-        // 3. REJECTION REASON DISPLAY (Required for Stage 3A)
         if (property.approvalStatus == PropertyApprovalStatus.REJECTED && !property.rejectionReason.isNullOrBlank()) {
           Spacer(modifier = Modifier.height(10.dp))
           Surface(
@@ -862,7 +975,6 @@ fun LandlordPropertyCard(
           }
         }
 
-        // 4. Pending Approval Status Message
         if (property.approvalStatus == PropertyApprovalStatus.PENDING_APPROVAL) {
           Spacer(modifier = Modifier.height(8.dp))
           Surface(
@@ -892,7 +1004,6 @@ fun LandlordPropertyCard(
           }
         }
 
-        // 5. Unavailable notice
         if (property.approvalStatus == PropertyApprovalStatus.UNAVAILABLE) {
           Spacer(modifier = Modifier.height(8.dp))
           Surface(
@@ -926,17 +1037,16 @@ fun LandlordPropertyCard(
         HorizontalDivider(color = SoftBlueBorder.copy(alpha = 0.5f))
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 6. Action Buttons: EDIT LISTING & MARK UNAVAILABLE
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          // Edit Listing Option
           OutlinedButton(
             onClick = onEditClick,
+            enabled = !isActionLoading,
             modifier = Modifier
               .weight(1f)
-              .height(44.dp)
+              .height(48.dp)
               .testTag("edit_listing_button_${property.id}"),
             shape = RoundedCornerShape(10.dp),
             border = BorderStroke(1.5.dp, SkyBluePrimary),
@@ -961,13 +1071,13 @@ fun LandlordPropertyCard(
             )
           }
 
-          // Mark as Unavailable / Mark as Available Option
           val isCurrentlyUnavailable = property.approvalStatus == PropertyApprovalStatus.UNAVAILABLE
           Button(
             onClick = onToggleAvailability,
+            enabled = !isActionLoading,
             modifier = Modifier
               .weight(1.2f)
-              .height(44.dp)
+              .height(48.dp)
               .testTag("toggle_availability_button_${property.id}"),
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(
@@ -993,29 +1103,6 @@ fun LandlordPropertyCard(
               )
             )
           }
-
-          // Resubmit Button (If REJECTED)
-          if (property.approvalStatus == PropertyApprovalStatus.REJECTED) {
-            OutlinedButton(
-              onClick = onResubmitClick,
-              modifier = Modifier
-                .height(44.dp)
-                .testTag("resubmit_button_${property.id}"),
-              shape = RoundedCornerShape(10.dp),
-              border = BorderStroke(1.5.dp, Color(0xFFD97706)),
-              colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color(0xFFFEF3C7),
-                contentColor = Color(0xFFB45309)
-              )
-            ) {
-              Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = Color(0xFFB45309)
-              )
-            }
-          }
         }
       }
     }
@@ -1026,17 +1113,26 @@ fun LandlordPropertyCard(
 fun EditPropertyDialog(
   property: PropertyItem,
   currentLanguage: AppLanguage,
+  isSaving: Boolean,
   onDismiss: () -> Unit,
-  onSave: (title: String, price: Long, area: String, description: String, rentalTerms: String) -> Unit
+  onSave: (
+    title: String,
+    price: Long,
+    area: String,
+    description: String,
+    fullAddress: String?,
+    landmark: String?
+  ) -> Unit
 ) {
   var title by remember { mutableStateOf(property.titleEn) }
   var priceString by remember { mutableStateOf(property.priceNaira.toString()) }
   var area by remember { mutableStateOf(property.area) }
   var description by remember { mutableStateOf(property.descriptionEn) }
-  var rentalTerms by remember { mutableStateOf(property.rentalTerms) }
+  var fullAddress by remember { mutableStateOf(property.fullAddress) }
+  var landmark by remember { mutableStateOf(property.landmark) }
 
   AlertDialog(
-    onDismissRequest = onDismiss,
+    onDismissRequest = { if (!isSaving) onDismiss() },
     title = {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Edit, contentDescription = null, tint = SkyBluePrimary)
@@ -1053,7 +1149,7 @@ fun EditPropertyDialog(
       LazyColumn(modifier = Modifier.fillMaxWidth()) {
         item {
           Text(
-            text = "Editing this property will submit changes to Dwello Homes for review.",
+            text = "Saving edits updates the server listing and submits changes for Dwello Homes review.",
             style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
           )
           Spacer(modifier = Modifier.height(12.dp))
@@ -1066,6 +1162,7 @@ fun EditPropertyDialog(
               .fillMaxWidth()
               .testTag("edit_title_input"),
             singleLine = true,
+            enabled = !isSaving,
             colors = OutlinedTextFieldDefaults.colors(
               focusedContainerColor = VeryLightBlueBackground,
               unfocusedContainerColor = VeryLightBlueBackground,
@@ -1078,14 +1175,15 @@ fun EditPropertyDialog(
 
           OutlinedTextField(
             value = priceString,
-            onValueChange = { priceString = it },
-            label = { Text("Yearly Rent (₦)") },
+            onValueChange = { priceString = it.filter { ch -> ch.isDigit() } },
+            label = { Text("Rent Amount (₦)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             prefix = { Text("₦ ", fontWeight = FontWeight.Bold, color = SkyBluePrimary) },
             modifier = Modifier
               .fillMaxWidth()
               .testTag("edit_price_input"),
             singleLine = true,
+            enabled = !isSaving,
             colors = OutlinedTextFieldDefaults.colors(
               focusedContainerColor = VeryLightBlueBackground,
               unfocusedContainerColor = VeryLightBlueBackground,
@@ -1099,11 +1197,50 @@ fun EditPropertyDialog(
           OutlinedTextField(
             value = area,
             onValueChange = { area = it },
-            label = { Text("Area in Benin City") },
+            label = { Text("Neighbourhood in Benin City") },
             modifier = Modifier
               .fillMaxWidth()
               .testTag("edit_area_input"),
             singleLine = true,
+            enabled = !isSaving,
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedContainerColor = VeryLightBlueBackground,
+              unfocusedContainerColor = VeryLightBlueBackground,
+              focusedBorderColor = SkyBluePrimary,
+              unfocusedBorderColor = SoftBlueBorder
+            )
+          )
+
+          Spacer(modifier = Modifier.height(8.dp))
+
+          OutlinedTextField(
+            value = fullAddress,
+            onValueChange = { fullAddress = it },
+            label = { Text("Full Address (Optional)") },
+            modifier = Modifier
+              .fillMaxWidth()
+              .testTag("edit_address_input"),
+            singleLine = true,
+            enabled = !isSaving,
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedContainerColor = VeryLightBlueBackground,
+              unfocusedContainerColor = VeryLightBlueBackground,
+              focusedBorderColor = SkyBluePrimary,
+              unfocusedBorderColor = SoftBlueBorder
+            )
+          )
+
+          Spacer(modifier = Modifier.height(8.dp))
+
+          OutlinedTextField(
+            value = landmark,
+            onValueChange = { landmark = it },
+            label = { Text("Nearby Landmark (Optional)") },
+            modifier = Modifier
+              .fillMaxWidth()
+              .testTag("edit_landmark_input"),
+            singleLine = true,
+            enabled = !isSaving,
             colors = OutlinedTextFieldDefaults.colors(
               focusedContainerColor = VeryLightBlueBackground,
               unfocusedContainerColor = VeryLightBlueBackground,
@@ -1123,24 +1260,7 @@ fun EditPropertyDialog(
               .height(100.dp)
               .testTag("edit_description_input"),
             maxLines = 4,
-            colors = OutlinedTextFieldDefaults.colors(
-              focusedContainerColor = VeryLightBlueBackground,
-              unfocusedContainerColor = VeryLightBlueBackground,
-              focusedBorderColor = SkyBluePrimary,
-              unfocusedBorderColor = SoftBlueBorder
-            )
-          )
-
-          Spacer(modifier = Modifier.height(8.dp))
-
-          OutlinedTextField(
-            value = rentalTerms,
-            onValueChange = { rentalTerms = it },
-            label = { Text("Rental Terms") },
-            modifier = Modifier
-              .fillMaxWidth()
-              .testTag("edit_terms_input"),
-            singleLine = true,
+            enabled = !isSaving,
             colors = OutlinedTextFieldDefaults.colors(
               focusedContainerColor = VeryLightBlueBackground,
               unfocusedContainerColor = VeryLightBlueBackground,
@@ -1155,8 +1275,16 @@ fun EditPropertyDialog(
       Button(
         onClick = {
           val cleanPrice = priceString.filter { it.isDigit() }.toLongOrNull() ?: property.priceNaira
-          onSave(title, cleanPrice, area, description, rentalTerms)
+          onSave(
+            title.trim().ifBlank { property.titleEn },
+            cleanPrice,
+            area.trim().ifBlank { property.area },
+            description.trim().ifBlank { property.descriptionEn },
+            fullAddress.trim().takeIf { it.isNotEmpty() },
+            landmark.trim().takeIf { it.isNotEmpty() }
+          )
         },
+        enabled = !isSaving,
         colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
         modifier = Modifier.testTag("save_listing_changes_button")
       ) {
@@ -1164,7 +1292,7 @@ fun EditPropertyDialog(
       }
     },
     dismissButton = {
-      TextButton(onClick = onDismiss) {
+      TextButton(onClick = onDismiss, enabled = !isSaving) {
         Text("Cancel", color = NavyTextSecondary)
       }
     }
@@ -1174,10 +1302,11 @@ fun EditPropertyDialog(
 @Composable
 fun LandlordEnquiriesDialog(
   currentLanguage: AppLanguage,
+  enquiriesState: AsyncResourceState<List<EnquiryItem>>,
+  isActionLoading: Boolean,
+  onUpdateStatus: (enquiryId: String, status: EnquiryStatus) -> Unit,
   onDismiss: () -> Unit
 ) {
-  val enquiries = EnquiryRepository.submittedEnquiries
-
   AlertDialog(
     onDismissRequest = onDismiss,
     title = {
@@ -1202,9 +1331,9 @@ fun LandlordEnquiriesDialog(
           ) {
             Text(
               text = if (currentLanguage == AppLanguage.ENGLISH)
-                "Dwello Homes coordinates tenant inspections directly. You do not need to share your phone number publicly."
+                "Dwello Homes coordinates tenant inspections directly. Update enquiry statuses below as inspections progress."
               else
-                "Dwello Homes dey coordinate all inspection direct. You no need give tenant your phone number.",
+                "Dwello Homes dey coordinate all inspection direct. You fit update enquiry status below.",
               modifier = Modifier.padding(10.dp),
               style = MaterialTheme.typography.bodySmall.copy(color = DeepNavyText)
             )
@@ -1212,68 +1341,131 @@ fun LandlordEnquiriesDialog(
           Spacer(modifier = Modifier.height(10.dp))
         }
 
-        if (enquiries.isEmpty()) {
-          item {
-            Text(
-              text = "No pending enquiries at this time.",
-              style = MaterialTheme.typography.bodyMedium.copy(color = NavyTextSecondary)
-            )
+        when (enquiriesState) {
+          is AsyncResourceState.Idle,
+          is AsyncResourceState.Loading -> {
+            item {
+              Row(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                CircularProgressIndicator(color = SkyBluePrimary, modifier = Modifier.size(22.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Loading enquiries...", color = NavyTextSecondary)
+              }
+            }
           }
-        } else {
-          items(enquiries) { enq ->
-            Card(
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 10.dp),
-              shape = RoundedCornerShape(10.dp),
-              colors = CardDefaults.cardColors(containerColor = Color.White),
-              border = BorderStroke(1.dp, SoftBlueBorder)
-            ) {
-              Column(modifier = Modifier.padding(10.dp)) {
-                Row(
-                  modifier = Modifier.fillMaxWidth(),
-                  horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                  Text(
-                    text = enq.propertyTitle,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                      fontWeight = FontWeight.Bold,
-                      color = DeepNavyText
-                    )
-                  )
-                  Text(
-                    text = enq.propertyPrice,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                      fontWeight = FontWeight.Bold,
-                      color = SkyBluePrimary
-                    )
-                  )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
+
+          is AsyncResourceState.Error -> {
+            item {
+              Text(
+                text = enquiriesState.message,
+                style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF991B1B))
+              )
+            }
+          }
+
+          is AsyncResourceState.Success -> {
+            val enquiries = enquiriesState.data
+            if (enquiries.isEmpty()) {
+              item {
                 Text(
-                  text = "Tenant: ${enq.tenantName} (${enq.tenantPhone})",
-                  style = MaterialTheme.typography.bodySmall.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = DeepNavyText
-                  )
+                  text = "No enquiries received yet.",
+                  style = MaterialTheme.typography.bodyMedium.copy(color = NavyTextSecondary)
                 )
-                Text(
-                  text = "Preferred Date: ${enq.preferredInspectionDate}",
-                  style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Surface(
-                  color = SoftBlueAccent,
-                  shape = RoundedCornerShape(6.dp)
+              }
+            } else {
+              items(enquiries, key = { it.id }) { enq ->
+                Card(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp),
+                  shape = RoundedCornerShape(10.dp),
+                  colors = CardDefaults.cardColors(containerColor = Color.White),
+                  border = BorderStroke(1.dp, SoftBlueBorder)
                 ) {
-                  Text(
-                    text = "Status: ${enq.statusEn}",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                      color = SkyBlueDark,
-                      fontWeight = FontWeight.Bold
+                  Column(modifier = Modifier.padding(10.dp)) {
+                    Row(
+                      modifier = Modifier.fillMaxWidth(),
+                      horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                      Text(
+                        text = enq.propertyTitle,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                          fontWeight = FontWeight.Bold,
+                          color = DeepNavyText
+                        ),
+                        modifier = Modifier.weight(1f)
+                      )
+                      if (enq.propertyPrice.isNotBlank()) {
+                        Text(
+                          text = enq.propertyPrice,
+                          style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = SkyBluePrimary
+                          )
+                        )
+                      }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                      text = "Tenant: ${enq.tenantName}",
+                      style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = DeepNavyText
+                      )
                     )
-                  )
+                    Text(
+                      text = "Preferred Date: ${enq.preferredInspectionDate}",
+                      style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+                    )
+                    if (enq.message.isNotBlank()) {
+                      Text(
+                        text = "\"${enq.message}\"",
+                        style = MaterialTheme.typography.bodySmall.copy(color = DeepNavyText)
+                      )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                      color = SoftBlueAccent,
+                      shape = RoundedCornerShape(6.dp)
+                    ) {
+                      Text(
+                        text = "Status: ${enq.statusEn}",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                          color = SkyBlueDark,
+                          fontWeight = FontWeight.Bold
+                        )
+                      )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                      if (enq.status != EnquiryStatus.CONTACTED) {
+                        OutlinedButton(
+                          onClick = { onUpdateStatus(enq.id, EnquiryStatus.CONTACTED) },
+                          enabled = !isActionLoading,
+                          contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                          border = BorderStroke(1.dp, SkyBluePrimary)
+                        ) {
+                          Text("Mark Contacted", fontSize = 11.sp, color = SkyBluePrimary)
+                        }
+                      }
+                      if (enq.status != EnquiryStatus.CLOSED) {
+                        OutlinedButton(
+                          onClick = { onUpdateStatus(enq.id, EnquiryStatus.CLOSED) },
+                          enabled = !isActionLoading,
+                          contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                          border = BorderStroke(1.dp, NavyTextSecondary)
+                        ) {
+                          Text("Close", fontSize = 11.sp, color = NavyTextSecondary)
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }

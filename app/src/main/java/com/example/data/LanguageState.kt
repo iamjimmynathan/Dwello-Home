@@ -247,10 +247,24 @@ object DwelloStrings {
     AppLanguage.PIDGIN -> "Not Available"
   }
 
-  // Demonstration Notice
-  fun demoNotice(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Sample Demonstration Listing — Not a Real Property"
-    AppLanguage.PIDGIN -> "Sample Demo House — No Be Real House"
+  fun verifiedListingLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Verified Listing"
+    AppLanguage.PIDGIN -> "Verified House"
+  }
+
+  fun savedFavouritesLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Saved"
+    AppLanguage.PIDGIN -> "Saved"
+  }
+
+  fun retryLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Retry"
+    AppLanguage.PIDGIN -> "Try Again"
+  }
+
+  fun loadingPropertiesLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Loading properties in Benin City..."
+    AppLanguage.PIDGIN -> "Dey load houses for Benin City..."
   }
 
   // Language switch indicator
@@ -832,49 +846,23 @@ object DwelloStrings {
     AppLanguage.PIDGIN -> "Please pick Tenant or Landlord account type."
   }
 
-  // Honest Demonstration Notices
-  fun demoAuthBannerText(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Demonstration UI Mode: Real authentication, password hashing, duplicate-phone checks, and SMS/OTP verification will be connected in the backend stage."
-    AppLanguage.PIDGIN -> "Demo UI Mode: Real login, password security, duplicate-number check, and OTP go connect when backend ready."
-  }
-
-  fun registrationDemoDialogTitle(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Frontend Registration Preview"
-    AppLanguage.PIDGIN -> "Registration Form Preview"
-  }
-
-  fun registrationDemoDialogBody(lang: AppLanguage, normalizedPhone: String): String = when (lang) {
-    AppLanguage.ENGLISH -> "Your inputs passed frontend validation (Normalized phone: $normalizedPhone).\n\nImportant: No real account has been created and your password was NOT stored. Real account creation, duplicate phone number checks, and OTP verification require backend integration."
-    AppLanguage.PIDGIN -> "Your form details pass validation (Phone: $normalizedPhone).\n\nImportant: Real account never create yet and we no save your password. Real account creation and OTP go work when backend connect."
-  }
-
-  fun loginDemoDialogTitle(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Frontend Login Preview"
-    AppLanguage.PIDGIN -> "Login Form Preview"
-  }
-
-  fun loginDemoDialogBody(lang: AppLanguage, normalizedPhone: String): String = when (lang) {
-    AppLanguage.ENGLISH -> "Phone ($normalizedPhone) and password format passed frontend validation.\n\nImportant: You are NOT authenticated yet because real authentication requires backend integration. Choose a role below to preview the post-login navigation."
-    AppLanguage.PIDGIN -> "Phone ($normalizedPhone) and password format pass validation.\n\nImportant: Real authentication never happen yet until backend connect. Pick role below to test navigation."
-  }
-
   fun roleRestrictedTitle(lang: AppLanguage): String = when (lang) {
     AppLanguage.ENGLISH -> "Role Access Notice"
     AppLanguage.PIDGIN -> "Account Role Notice"
   }
 
   fun roleRestrictedTenantToLandlord(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "You are signed in with a Tenant account. Landlord property management and listing screens are only available to Landlord accounts. You can switch your role or account from Profile."
-    AppLanguage.PIDGIN -> "You dey use Tenant account now. Na only Landlord account fit open property management and post house screens. You fit change role or account for Profile."
+    AppLanguage.ENGLISH -> "You are signed in with a Tenant account. Landlord property management and listing screens are only available to Landlord accounts. Log out from Profile and sign in with a Landlord account if you want to list a property."
+    AppLanguage.PIDGIN -> "You dey use Tenant account now. Na only Landlord account fit open property management and post house screens. Log out for Profile and sign in with Landlord account if you wan post house."
   }
 
   fun roleRestrictedLandlordToTenant(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "You are signed in with a Landlord account. Tenant property search is only available to Tenant accounts. You can switch to a Tenant role in Profile if you want to browse available houses."
-    AppLanguage.PIDGIN -> "You dey use Landlord account now. Na only Tenant account fit search houses. You fit change to Tenant for Profile if you wan find house."
+    AppLanguage.ENGLISH -> "You are signed in with a Landlord account. Tenant property search is only available to Tenant accounts. Log out from Profile and sign in with a Tenant account if you want to browse available houses."
+    AppLanguage.PIDGIN -> "You dey use Landlord account now. Na only Tenant account fit search houses. Log out for Profile and sign in with Tenant account if you wan find house."
   }
 
   fun logoutToWelcomeBtn(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Log Out (Welcome / Login)"
-    AppLanguage.PIDGIN -> "Comot (Welcome / Login)"
+    AppLanguage.ENGLISH -> "Log Out"
+    AppLanguage.PIDGIN -> "Log Out"
   }
 }

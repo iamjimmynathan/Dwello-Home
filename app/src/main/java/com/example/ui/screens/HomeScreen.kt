@@ -29,19 +29,24 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ElectricBolt
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,10 +73,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.data.AppLanguage
+import com.example.data.AuthenticatedUser
 import com.example.data.DwelloStrings
 import com.example.data.PropertyItem
+import com.example.data.RentalPeriod
 import com.example.data.SamplePropertyData
+import com.example.ui.AsyncResourceState
 import com.example.ui.components.DwelloHeader
 import com.example.ui.theme.CardBorderSubtle
 import com.example.ui.theme.CardSurfaceWhite
@@ -88,9 +97,23 @@ import com.example.ui.theme.WarmAmberAccent
 @Composable
 fun HomeScreen(
   currentLanguage: AppLanguage,
+  propertiesState: AsyncResourceState<List<PropertyItem>>,
+  favouriteIds: Set<String>,
+  favouriteActionIds: Set<String>,
+  selectedPropertyDetailState: AsyncResourceState<PropertyItem>?,
+  currentUser: AuthenticatedUser?,
+  enquirySubmitting: Boolean,
+  enquirySubmitError: String?,
+  enquirySubmittedSuccess: Boolean,
   onLanguageToggle: () -> Unit,
   onNavigateToFindHouses: (searchQuery: String?) -> Unit,
   onNavigateToPostHouse: () -> Unit,
+  onRetryLoadProperties: () -> Unit,
+  onToggleFavourite: (String) -> Unit,
+  onOpenPropertyDetails: (PropertyItem) -> Unit,
+  onClosePropertyDetails: () -> Unit,
+  onSubmitEnquiry: (propertyId: String, message: String?, preferredInspectionDate: String?) -> Unit,
+  onResetEnquiryState: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
@@ -98,7 +121,6 @@ fun HomeScreen(
   var selectedArea by remember { mutableStateOf<String?>(null) }
   var showAreaPicker by remember { mutableStateOf(false) }
   var showHelpDialog by remember { mutableStateOf(false) }
-  var selectedPropertyForDetails by remember { mutableStateOf<PropertyItem?>(null) }
   var enquiryProperty by remember { mutableStateOf<PropertyItem?>(null) }
 
   Column(
@@ -413,16 +435,145 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(8.dp))
       }
 
-      // Property Cards with Photographs and Intermediary "Send Enquiry" Action
-      val displayedProperties = SamplePropertyData.getApprovedPublicProperties().take(3)
-      items(displayedProperties) { property ->
-        PropertyCard(
-          property = property,
-          currentLanguage = currentLanguage,
-          onClick = { selectedPropertyForDetails = property },
-          onEnquiryClick = { enquiryProperty = property },
-          modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
-        )
+      when (propertiesState) {
+        is AsyncResourceState.Idle,
+        is AsyncResourceState.Loading -> {
+          item {
+            Card(
+              modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .testTag("home_properties_loading"),
+              shape = RoundedCornerShape(16.dp),
+              colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
+              border = BorderStroke(1.dp, SoftBlueBorder)
+            ) {
+              Column(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+              ) {
+                CircularProgressIndicator(
+                  color = SkyBluePrimary,
+                  modifier = Modifier.size(32.dp)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                  text = DwelloStrings.loadingPropertiesLabel(currentLanguage),
+                  style = MaterialTheme.typography.bodyMedium.copy(
+                    color = DeepNavyText,
+                    fontWeight = FontWeight.Medium
+                  )
+                )
+              }
+            }
+          }
+        }
+
+        is AsyncResourceState.Error -> {
+          item {
+            Card(
+              modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .testTag("home_properties_error"),
+              shape = RoundedCornerShape(16.dp),
+              colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+              border = BorderStroke(1.dp, Color(0xFFFECACA))
+            ) {
+              Column(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Warning,
+                  contentDescription = null,
+                  tint = Color(0xFFDC2626),
+                  modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                  text = propertiesState.message,
+                  style = MaterialTheme.typography.bodyMedium.copy(
+                    color = Color(0xFF991B1B),
+                    fontWeight = FontWeight.Medium
+                  )
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                  onClick = onRetryLoadProperties,
+                  colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
+                  shape = RoundedCornerShape(10.dp),
+                  modifier = Modifier.testTag("home_properties_retry_button")
+                ) {
+                  Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(DwelloStrings.retryLabel(currentLanguage), fontWeight = FontWeight.Bold)
+                }
+              }
+            }
+          }
+        }
+
+        is AsyncResourceState.Success -> {
+          val displayedProperties = propertiesState.data.take(3)
+          if (displayedProperties.isEmpty()) {
+            item {
+              Card(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(horizontal = 20.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
+                border = BorderStroke(1.dp, SoftBlueBorder)
+              ) {
+                Column(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.Home,
+                    contentDescription = null,
+                    tint = SkyBluePrimary,
+                    modifier = Modifier.size(34.dp)
+                  )
+                  Spacer(modifier = Modifier.height(8.dp))
+                  Text(
+                    text = if (currentLanguage == AppLanguage.ENGLISH)
+                      "No approved properties are currently listed."
+                    else
+                      "Approved houses never show yet.",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                      color = DeepNavyText,
+                      fontWeight = FontWeight.SemiBold
+                    )
+                  )
+                }
+              }
+            }
+          } else {
+            items(displayedProperties, key = { it.id }) { property ->
+              PropertyCard(
+                property = property,
+                currentLanguage = currentLanguage,
+                isFavourite = favouriteIds.contains(property.id),
+                isFavouriteLoading = favouriteActionIds.contains(property.id),
+                onToggleFavourite = { onToggleFavourite(property.id) },
+                onClick = { onOpenPropertyDetails(property) },
+                onEnquiryClick = {
+                  onResetEnquiryState()
+                  enquiryProperty = property
+                },
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
+              )
+            }
+          }
+        }
       }
 
       // 6. Contact Section: "Need help? Contact Dwello Homes."
@@ -629,7 +780,7 @@ fun HomeScreen(
           )
           Spacer(modifier = Modifier.height(12.dp))
           Text(
-            text = "📞 Phone: +234 800 393 556\n💬 WhatsApp: +234 803 123 4567\n📍 Benin Hub: Ring Road Axis, Edo State",
+            text = "Phone: +234 800 393 556\nBenin Hub: Ring Road Axis, Edo State",
             style = MaterialTheme.typography.bodySmall.copy(
               color = SkyBlueDark,
               fontWeight = FontWeight.SemiBold,
@@ -663,21 +814,29 @@ fun HomeScreen(
     EnquirySubmissionDialog(
       property = prop,
       currentLanguage = currentLanguage,
-      onDismiss = { enquiryProperty = null },
-      onSubmit = {
+      currentUser = currentUser,
+      isSubmitting = enquirySubmitting,
+      submitError = enquirySubmitError,
+      isSubmitted = enquirySubmittedSuccess,
+      onDismiss = {
+        onResetEnquiryState()
         enquiryProperty = null
+      },
+      onSubmit = { preferredDate, message ->
+        onSubmitEnquiry(prop.id, message, preferredDate)
       }
     )
   }
 
-  // Property Details Dialog
-  selectedPropertyForDetails?.let { prop ->
+  // Property Details Dialog (live fetched via GET /api/properties/{id})
+  selectedPropertyDetailState?.let { detailState ->
     PropertyDetailDialog(
-      property = prop,
+      detailState = detailState,
       currentLanguage = currentLanguage,
-      onDismiss = { selectedPropertyForDetails = null },
-      onEnquire = {
-        selectedPropertyForDetails = null
+      onDismiss = onClosePropertyDetails,
+      onEnquire = { prop ->
+        onClosePropertyDetails()
+        onResetEnquiryState()
         enquiryProperty = prop
       }
     )
@@ -688,6 +847,9 @@ fun HomeScreen(
 fun PropertyCard(
   property: PropertyItem,
   currentLanguage: AppLanguage,
+  isFavourite: Boolean,
+  isFavouriteLoading: Boolean,
+  onToggleFavourite: () -> Unit,
   onClick: () -> Unit,
   onEnquiryClick: () -> Unit,
   modifier: Modifier = Modifier
@@ -710,14 +872,25 @@ fun PropertyCard(
           .fillMaxWidth()
           .height(140.dp)
       ) {
-        Image(
-          painter = painterResource(id = property.imageResId),
-          contentDescription = property.titleEn,
-          modifier = Modifier.fillMaxSize(),
-          contentScale = ContentScale.Crop
-        )
+        if (property.photoUris.isNotEmpty()) {
+          AsyncImage(
+            model = property.photoUris.first(),
+            contentDescription = property.titleEn,
+            placeholder = painterResource(id = property.imageResId),
+            error = painterResource(id = property.imageResId),
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+          )
+        } else {
+          Image(
+            painter = painterResource(id = property.imageResId),
+            contentDescription = property.titleEn,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+          )
+        }
 
-        // Demonstration Data Pill
+        // Verified Listing Pill
         Surface(
           modifier = Modifier
             .padding(10.dp)
@@ -730,14 +903,14 @@ fun PropertyCard(
             verticalAlignment = Alignment.CenterVertically
           ) {
             Icon(
-              imageVector = Icons.Default.Info,
+              imageVector = Icons.Default.Verified,
               contentDescription = null,
               tint = Color.White,
               modifier = Modifier.size(12.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-              text = if (currentLanguage == AppLanguage.ENGLISH) "Demonstration Listing" else "Demo Listing",
+              text = DwelloStrings.verifiedListingLabel(currentLanguage),
               style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = 10.sp,
                 color = Color.White,
@@ -764,6 +937,35 @@ fun PropertyCard(
               fontWeight = FontWeight.Bold
             )
           )
+        }
+
+        // Favourite toggle button
+        Surface(
+          modifier = Modifier
+            .padding(8.dp)
+            .align(Alignment.BottomEnd),
+          color = Color.White.copy(alpha = 0.92f),
+          shape = CircleShape,
+          shadowElevation = 2.dp
+        ) {
+          IconButton(
+            onClick = onToggleFavourite,
+            enabled = !isFavouriteLoading,
+            modifier = Modifier
+              .size(40.dp)
+              .testTag("home_favourite_btn_${property.id}")
+          ) {
+            if (isFavouriteLoading) {
+              CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = SkyBluePrimary)
+            } else {
+              Icon(
+                imageVector = if (isFavourite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = if (isFavourite) "Remove from saved" else "Save property",
+                tint = if (isFavourite) Color(0xFFE11D48) else DeepNavyText,
+                modifier = Modifier.size(20.dp)
+              )
+            }
+          }
         }
       }
 
@@ -814,7 +1016,10 @@ fun PropertyCard(
               )
             )
             Text(
-              text = DwelloStrings.perYear(currentLanguage),
+              text = if (property.rentalPeriod == RentalPeriod.MONTHLY)
+                DwelloStrings.perMonth(currentLanguage)
+              else
+                DwelloStrings.perYear(currentLanguage),
               style = MaterialTheme.typography.labelSmall.copy(
                 color = NavyTextSecondary
               )
@@ -946,17 +1151,19 @@ fun PropertyCard(
 fun EnquirySubmissionDialog(
   property: PropertyItem,
   currentLanguage: AppLanguage,
+  currentUser: AuthenticatedUser?,
+  isSubmitting: Boolean,
+  submitError: String?,
+  isSubmitted: Boolean,
   onDismiss: () -> Unit,
-  onSubmit: () -> Unit
+  onSubmit: (preferredDate: String, message: String) -> Unit
 ) {
-  var tenantName by remember { mutableStateOf("") }
-  var tenantPhone by remember { mutableStateOf("") }
   var inspectionDate by remember { mutableStateOf("This Weekend") }
-  var submitted by remember { mutableStateOf(false) }
+  var additionalMessage by remember { mutableStateOf("") }
 
-  if (!submitted) {
+  if (!isSubmitted) {
     AlertDialog(
-      onDismissRequest = onDismiss,
+      onDismissRequest = { if (!isSubmitting) onDismiss() },
       title = {
         Text(
           text = if (currentLanguage == AppLanguage.ENGLISH) "Send Enquiry via Dwello Homes" else "Send Enquiry to Dwello Homes",
@@ -977,44 +1184,37 @@ fun EnquirySubmissionDialog(
           Spacer(modifier = Modifier.height(4.dp))
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH)
-              "Dwello Homes will connect you with the landlord and coordinate your physical inspection."
+              "Dwello Homes will coordinate your inspection directly with the landlord."
             else
               "Dwello Homes go connect you with the landlord and arrange your inspection date.",
             style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
           )
+
+          if (currentUser != null) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Surface(
+              color = VeryLightBlueBackground,
+              shape = RoundedCornerShape(8.dp),
+              border = BorderStroke(1.dp, SoftBlueBorder),
+              modifier = Modifier.fillMaxWidth()
+            ) {
+              Column(modifier = Modifier.padding(10.dp)) {
+                Text(
+                  text = "Account: ${currentUser.fullName}",
+                  style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = DeepNavyText
+                  )
+                )
+                Text(
+                  text = "Phone: ${currentUser.phone}",
+                  style = MaterialTheme.typography.labelSmall.copy(color = NavyTextSecondary)
+                )
+              }
+            }
+          }
+
           Spacer(modifier = Modifier.height(12.dp))
-
-          OutlinedTextField(
-            value = tenantName,
-            onValueChange = { tenantName = it },
-            label = { Text("Your Name") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-              focusedContainerColor = VeryLightBlueBackground,
-              unfocusedContainerColor = VeryLightBlueBackground,
-              focusedBorderColor = SkyBluePrimary,
-              unfocusedBorderColor = SoftBlueBorder
-            )
-          )
-
-          Spacer(modifier = Modifier.height(8.dp))
-
-          OutlinedTextField(
-            value = tenantPhone,
-            onValueChange = { tenantPhone = it },
-            label = { Text("Phone Number") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-              focusedContainerColor = VeryLightBlueBackground,
-              unfocusedContainerColor = VeryLightBlueBackground,
-              focusedBorderColor = SkyBluePrimary,
-              unfocusedBorderColor = SoftBlueBorder
-            )
-          )
-
-          Spacer(modifier = Modifier.height(8.dp))
 
           OutlinedTextField(
             value = inspectionDate,
@@ -1022,6 +1222,7 @@ fun EnquirySubmissionDialog(
             label = { Text("Preferred Inspection Time") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            enabled = !isSubmitting,
             colors = OutlinedTextFieldDefaults.colors(
               focusedContainerColor = VeryLightBlueBackground,
               unfocusedContainerColor = VeryLightBlueBackground,
@@ -1029,18 +1230,56 @@ fun EnquirySubmissionDialog(
               unfocusedBorderColor = SoftBlueBorder
             )
           )
+
+          Spacer(modifier = Modifier.height(8.dp))
+
+          OutlinedTextField(
+            value = additionalMessage,
+            onValueChange = { additionalMessage = it },
+            label = { Text("Message (Optional)") },
+            modifier = Modifier.fillMaxWidth(),
+            maxLines = 3,
+            enabled = !isSubmitting,
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedContainerColor = VeryLightBlueBackground,
+              unfocusedContainerColor = VeryLightBlueBackground,
+              focusedBorderColor = SkyBluePrimary,
+              unfocusedBorderColor = SoftBlueBorder
+            )
+          )
+
+          if (!submitError.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+              text = submitError,
+              style = MaterialTheme.typography.labelSmall.copy(
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Bold
+              ),
+              modifier = Modifier.testTag("home_enquiry_error")
+            )
+          }
         }
       },
       confirmButton = {
         Button(
-          onClick = { submitted = true },
+          onClick = { onSubmit(inspectionDate.trim(), additionalMessage.trim()) },
+          enabled = !isSubmitting,
           colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
         ) {
-          Text("Submit Enquiry")
+          if (isSubmitting) {
+            CircularProgressIndicator(
+              color = Color.White,
+              strokeWidth = 2.dp,
+              modifier = Modifier.size(16.dp)
+            )
+          } else {
+            Text("Submit Enquiry")
+          }
         }
       },
       dismissButton = {
-        TextButton(onClick = onDismiss) {
+        TextButton(onClick = onDismiss, enabled = !isSubmitting) {
           Text("Cancel", color = NavyTextSecondary)
         }
       }
@@ -1062,18 +1301,15 @@ fun EnquirySubmissionDialog(
       text = {
         Text(
           text = if (currentLanguage == AppLanguage.ENGLISH)
-            "Your enquiry for ${property.titleEn} in ${property.area} has been received by Dwello Homes. We will contact the property owner and update you shortly."
+            "Your enquiry for ${property.titleEn} in ${property.area} has been sent to Dwello Homes. Track its status anytime in the Enquiries tab."
           else
-            "Dwello Homes don receive your enquiry for ${property.titleEn}. We go contact the house owner and get back to you sharp sharp.",
+            "Dwello Homes don receive your enquiry for ${property.titleEn}. You fit check update for Enquiries tab.",
           style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText)
         )
       },
       confirmButton = {
         Button(
-          onClick = {
-            onSubmit()
-            onDismiss()
-          },
+          onClick = onDismiss,
           colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
         ) {
           Text("Done")
@@ -1085,131 +1321,182 @@ fun EnquirySubmissionDialog(
 
 @Composable
 fun PropertyDetailDialog(
-  property: PropertyItem,
+  detailState: AsyncResourceState<PropertyItem>,
   currentLanguage: AppLanguage,
   onDismiss: () -> Unit,
-  onEnquire: () -> Unit
+  onEnquire: (PropertyItem) -> Unit
 ) {
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = {
-      Text(
-        text = if (currentLanguage == AppLanguage.ENGLISH) property.titleEn else property.titlePidgin,
-        fontWeight = FontWeight.Bold,
-        color = DeepNavyText,
-        fontSize = 18.sp
-      )
-    },
-    text = {
-      LazyColumn(modifier = Modifier.fillMaxWidth()) {
-        item {
-          // Property Hero Photograph
-          Box(
+  when (detailState) {
+    is AsyncResourceState.Idle,
+    is AsyncResourceState.Loading -> {
+      AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Loading Property", fontWeight = FontWeight.Bold, color = DeepNavyText) },
+        text = {
+          Row(
             modifier = Modifier
               .fillMaxWidth()
-              .height(160.dp)
-              .clip(RoundedCornerShape(10.dp))
+              .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
           ) {
-            Image(
-              painter = painterResource(id = property.imageResId),
-              contentDescription = property.titleEn,
-              modifier = Modifier.fillMaxSize(),
-              contentScale = ContentScale.Crop
-            )
+            CircularProgressIndicator(color = SkyBluePrimary, modifier = Modifier.size(28.dp))
+            Spacer(modifier = Modifier.width(12.dp))
+            Text("Fetching full property details...", color = NavyTextSecondary)
           }
+        },
+        confirmButton = {
+          TextButton(onClick = onDismiss) { Text("Close", color = SkyBluePrimary) }
+        }
+      )
+    }
 
-          Spacer(modifier = Modifier.height(10.dp))
+    is AsyncResourceState.Error -> {
+      AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Unable to Load Property", fontWeight = FontWeight.Bold, color = DeepNavyText) },
+        text = { Text(detailState.message, color = Color(0xFF991B1B)) },
+        confirmButton = {
+          TextButton(onClick = onDismiss) { Text("Close", color = SkyBluePrimary) }
+        }
+      )
+    }
 
-          // Demonstration Data Notice
-          Surface(
-            color = Color(0xFFF1F5F9),
-            shape = RoundedCornerShape(6.dp),
-            modifier = Modifier.fillMaxWidth()
-          ) {
-            Row(
-              modifier = Modifier.padding(8.dp),
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Icon(
-                imageVector = Icons.Default.Info,
-                contentDescription = null,
-                tint = NavyTextSecondary,
-                modifier = Modifier.size(14.dp)
-              )
-              Spacer(modifier = Modifier.width(6.dp))
+    is AsyncResourceState.Success -> {
+      val property = detailState.data
+      AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+          Text(
+            text = if (currentLanguage == AppLanguage.ENGLISH) property.titleEn else property.titlePidgin,
+            fontWeight = FontWeight.Bold,
+            color = DeepNavyText,
+            fontSize = 18.sp
+          )
+        },
+        text = {
+          LazyColumn(modifier = Modifier.fillMaxWidth()) {
+            item {
+              Box(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .height(160.dp)
+                  .clip(RoundedCornerShape(10.dp))
+              ) {
+                if (property.photoUris.isNotEmpty()) {
+                  AsyncImage(
+                    model = property.photoUris.first(),
+                    contentDescription = property.titleEn,
+                    placeholder = painterResource(id = property.imageResId),
+                    error = painterResource(id = property.imageResId),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                  )
+                } else {
+                  Image(
+                    painter = painterResource(id = property.imageResId),
+                    contentDescription = property.titleEn,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                  )
+                }
+              }
+
+              Spacer(modifier = Modifier.height(10.dp))
+
+              Surface(
+                color = SoftBlueAccent,
+                shape = RoundedCornerShape(6.dp),
+                modifier = Modifier.fillMaxWidth()
+              ) {
+                Row(
+                  modifier = Modifier.padding(8.dp),
+                  verticalAlignment = Alignment.CenterVertically
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.Verified,
+                    contentDescription = null,
+                    tint = SkyBluePrimary,
+                    modifier = Modifier.size(14.dp)
+                  )
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(
+                    text = "${DwelloStrings.verifiedListingLabel(currentLanguage)} - DWELLO HOMES Benin City",
+                    style = MaterialTheme.typography.labelSmall.copy(color = DeepNavyText, fontSize = 11.sp)
+                  )
+                }
+              }
+
+              Spacer(modifier = Modifier.height(10.dp))
+
+              val periodText = if (property.rentalPeriod == RentalPeriod.MONTHLY) {
+                DwelloStrings.perMonth(currentLanguage)
+              } else {
+                DwelloStrings.perYear(currentLanguage)
+              }
               Text(
-                text = if (currentLanguage == AppLanguage.ENGLISH)
-                  "Sample demonstration listing - DWELLO HOMES Benin City"
-                else
-                  "Sample demo listing - DWELLO HOMES Benin City",
-                style = MaterialTheme.typography.labelSmall.copy(color = NavyTextSecondary, fontSize = 11.sp)
-              )
-            }
-          }
-
-          Spacer(modifier = Modifier.height(10.dp))
-
-          Text(
-            text = "${property.priceFormatted} ${DwelloStrings.perYear(currentLanguage)}",
-            style = MaterialTheme.typography.titleMedium.copy(
-              color = SkyBluePrimary,
-              fontWeight = FontWeight.ExtraBold
-            )
-          )
-          Spacer(modifier = Modifier.height(4.dp))
-          Text(
-            text = "📍 ${property.neighborhoodNote}, ${property.area}, Benin City",
-            style = MaterialTheme.typography.bodyMedium.copy(
-              color = NavyTextSecondary,
-              fontWeight = FontWeight.Medium
-            )
-          )
-          Spacer(modifier = Modifier.height(10.dp))
-          Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH) property.descriptionEn else property.descriptionPidgin,
-            style = MaterialTheme.typography.bodyMedium.copy(
-              color = DeepNavyText,
-              lineHeight = 20.sp
-            )
-          )
-          Spacer(modifier = Modifier.height(12.dp))
-          Surface(
-            color = VeryLightBlueBackground,
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, SoftBlueBorder)
-          ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-              Text(
-                text = "Property Owner: ${property.landlordName}",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                  fontWeight = FontWeight.Bold,
-                  color = DeepNavyText
+                text = "${property.priceFormatted} $periodText",
+                style = MaterialTheme.typography.titleMedium.copy(
+                  color = SkyBluePrimary,
+                  fontWeight = FontWeight.ExtraBold
                 )
               )
+              Spacer(modifier = Modifier.height(4.dp))
               Text(
-                text = "Intermediary: Dwello Homes coordinates all physical inspections and communications directly with the landlord.",
-                style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+                text = "${property.neighborhoodNote}, ${property.area}, Benin City",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                  color = NavyTextSecondary,
+                  fontWeight = FontWeight.Medium
+                )
               )
+              Spacer(modifier = Modifier.height(10.dp))
+              Text(
+                text = if (currentLanguage == AppLanguage.ENGLISH) property.descriptionEn else property.descriptionPidgin,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                  color = DeepNavyText,
+                  lineHeight = 20.sp
+                )
+              )
+              Spacer(modifier = Modifier.height(12.dp))
+              Surface(
+                color = VeryLightBlueBackground,
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, SoftBlueBorder)
+              ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                  Text(
+                    text = "Property Owner: ${property.landlordName}",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                      fontWeight = FontWeight.Bold,
+                      color = DeepNavyText
+                    )
+                  )
+                  Text(
+                    text = "Intermediary: Dwello Homes coordinates all physical inspections and communications directly.",
+                    style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+                  )
+                }
+              }
             }
           }
+        },
+        confirmButton = {
+          Button(
+            onClick = { onEnquire(property) },
+            colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
+          ) {
+            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(DwelloStrings.sendEnquiry(currentLanguage))
+          }
+        },
+        dismissButton = {
+          TextButton(onClick = onDismiss) {
+            Text("Close", color = NavyTextSecondary)
+          }
         }
-      }
-    },
-    confirmButton = {
-      Button(
-        onClick = onEnquire,
-        colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
-      ) {
-        Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(DwelloStrings.sendEnquiry(currentLanguage))
-      }
-    },
-    dismissButton = {
-      TextButton(onClick = onDismiss) {
-        Text("Close", color = NavyTextSecondary)
-      }
+      )
     }
-  )
+  }
 }

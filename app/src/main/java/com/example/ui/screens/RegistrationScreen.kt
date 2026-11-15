@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddHome
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -33,6 +34,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,7 +47,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,13 +61,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AppLanguage
 import com.example.data.AuthAccountRole
-import com.example.data.AuthBackendResult
 import com.example.data.AuthFormValidator
-import com.example.data.DemoAuthGateway
 import com.example.data.DwelloStrings
 import com.example.data.RegistrationValidationResult
 import com.example.ui.components.AuthTopBar
-import com.example.ui.components.DemoAuthNoticeBanner
 import com.example.ui.components.NigerianPhoneInputField
 import com.example.ui.theme.DeepNavyText
 import com.example.ui.theme.ErrorRed
@@ -75,22 +73,28 @@ import com.example.ui.theme.NavyTextSecondary
 import com.example.ui.theme.SkyBluePrimary
 import com.example.ui.theme.SoftBlueBorder
 import com.example.ui.theme.VeryLightBlueBackground
-import kotlinx.coroutines.launch
 
 @Composable
 fun RegistrationScreen(
   currentLanguage: AppLanguage,
   selectedRole: AuthAccountRole,
+  isLoading: Boolean,
+  serverError: String?,
   onLanguageToggle: () -> Unit,
   onChangeRoleClick: () -> Unit,
   onNavigateToLogin: () -> Unit,
-  onPreviewAuthenticatedRole: (AuthAccountRole) -> Unit,
+  onRegisterSubmit: (
+    fullName: String,
+    normalizedPhone: String,
+    email: String?,
+    passwordChars: CharArray,
+    role: AuthAccountRole
+  ) -> Unit,
+  onClearError: () -> Unit,
   onBack: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   BackHandler(onBack = onBack)
-
-  val scope = rememberCoroutineScope()
 
   var fullName by remember { mutableStateOf("") }
   var phoneInput by remember { mutableStateOf("") }
@@ -102,7 +106,6 @@ fun RegistrationScreen(
   var acceptedTerms by remember { mutableStateOf(false) }
 
   var validationResult by remember { mutableStateOf<RegistrationValidationResult?>(null) }
-  var demoDialogNormalizedPhone by remember { mutableStateOf<String?>(null) }
   var showTermsDialog by remember { mutableStateOf(false) }
 
   Column(
@@ -190,6 +193,7 @@ fun RegistrationScreen(
 
           TextButton(
             onClick = onChangeRoleClick,
+            enabled = !isLoading,
             modifier = Modifier
               .heightIn(min = 48.dp)
               .testTag("registration_change_role_button")
@@ -216,7 +220,10 @@ fun RegistrationScreen(
       Spacer(modifier = Modifier.height(6.dp))
       OutlinedTextField(
         value = fullName,
-        onValueChange = { fullName = it },
+        onValueChange = {
+          fullName = it
+          if (serverError != null) onClearError()
+        },
         modifier = Modifier
           .fillMaxWidth()
           .testTag("register_fullname_input"),
@@ -231,6 +238,7 @@ fun RegistrationScreen(
         },
         isError = validationResult?.fullNameError != null,
         singleLine = true,
+        enabled = !isLoading,
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
           focusedContainerColor = Color.White,
@@ -256,7 +264,10 @@ fun RegistrationScreen(
       // 2. Nigerian Phone Number (Required)
       NigerianPhoneInputField(
         phoneInput = phoneInput,
-        onPhoneChange = { phoneInput = it },
+        onPhoneChange = {
+          phoneInput = it
+          if (serverError != null) onClearError()
+        },
         currentLanguage = currentLanguage,
         errorText = validationResult?.phoneError,
         fieldTestTag = "register_phone_input",
@@ -276,7 +287,10 @@ fun RegistrationScreen(
       Spacer(modifier = Modifier.height(6.dp))
       OutlinedTextField(
         value = emailInput,
-        onValueChange = { emailInput = it },
+        onValueChange = {
+          emailInput = it
+          if (serverError != null) onClearError()
+        },
         modifier = Modifier
           .fillMaxWidth()
           .testTag("register_email_input"),
@@ -291,6 +305,7 @@ fun RegistrationScreen(
         },
         isError = validationResult?.emailError != null,
         singleLine = true,
+        enabled = !isLoading,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
@@ -325,7 +340,10 @@ fun RegistrationScreen(
       Spacer(modifier = Modifier.height(6.dp))
       OutlinedTextField(
         value = password,
-        onValueChange = { password = it },
+        onValueChange = {
+          password = it
+          if (serverError != null) onClearError()
+        },
         modifier = Modifier
           .fillMaxWidth()
           .testTag("register_password_input"),
@@ -356,6 +374,7 @@ fun RegistrationScreen(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         isError = validationResult?.passwordError != null,
         singleLine = true,
+        enabled = !isLoading,
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
           focusedContainerColor = Color.White,
@@ -389,7 +408,10 @@ fun RegistrationScreen(
       Spacer(modifier = Modifier.height(6.dp))
       OutlinedTextField(
         value = confirmPassword,
-        onValueChange = { confirmPassword = it },
+        onValueChange = {
+          confirmPassword = it
+          if (serverError != null) onClearError()
+        },
         modifier = Modifier
           .fillMaxWidth()
           .testTag("register_confirm_password_input"),
@@ -420,6 +442,7 @@ fun RegistrationScreen(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         isError = validationResult?.confirmPasswordError != null,
         singleLine = true,
+        enabled = !isLoading,
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
           focusedContainerColor = Color.White,
@@ -448,14 +471,14 @@ fun RegistrationScreen(
           .fillMaxWidth()
           .heightIn(min = 48.dp)
           .clip(RoundedCornerShape(10.dp))
-          .clickable { acceptedTerms = !acceptedTerms }
+          .clickable(enabled = !isLoading) { acceptedTerms = !acceptedTerms }
           .padding(vertical = 4.dp)
           .testTag("register_terms_row"),
         verticalAlignment = Alignment.CenterVertically
       ) {
         Checkbox(
           checked = acceptedTerms,
-          onCheckedChange = { acceptedTerms = it },
+          onCheckedChange = { if (!isLoading) acceptedTerms = it },
           colors = CheckboxDefaults.colors(
             checkedColor = SkyBluePrimary,
             uncheckedColor = NavyTextSecondary
@@ -480,7 +503,7 @@ fun RegistrationScreen(
           .testTag("register_view_terms_button")
       ) {
         Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "Read Terms & Privacy Summary" else "Read Terms & Privacy Summary",
+          text = "Read Terms & Privacy Summary",
           color = SkyBluePrimary,
           fontWeight = FontWeight.SemiBold
         )
@@ -494,10 +517,37 @@ fun RegistrationScreen(
         )
       }
 
-      Spacer(modifier = Modifier.height(14.dp))
-
-      // Honest Demo Notice
-      DemoAuthNoticeBanner(currentLanguage = currentLanguage)
+      if (!serverError.isNullOrBlank()) {
+        Spacer(modifier = Modifier.height(10.dp))
+        Surface(
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("register_server_error"),
+          color = Color(0xFFFEF2F2),
+          shape = RoundedCornerShape(12.dp),
+          border = BorderStroke(1.dp, Color(0xFFFECACA))
+        ) {
+          Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Icon(
+              imageVector = Icons.Default.ErrorOutline,
+              contentDescription = null,
+              tint = ErrorRed,
+              modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+              text = serverError,
+              style = MaterialTheme.typography.bodySmall.copy(
+                color = Color(0xFF991B1B),
+                fontWeight = FontWeight.Medium
+              )
+            )
+          }
+        }
+      }
 
       Spacer(modifier = Modifier.height(18.dp))
 
@@ -516,21 +566,17 @@ fun RegistrationScreen(
           )
           validationResult = result
           if (result.isValid && result.normalizedPhone != null) {
-            scope.launch {
-              val passwordChars = password.toCharArray()
-              val gatewayResult = DemoAuthGateway.registerWithPhone(
-                fullName = fullName.trim(),
-                normalizedPhone = result.normalizedPhone,
-                email = emailInput.trim().ifEmpty { null },
-                rawPasswordChars = passwordChars,
-                role = selectedRole
-              )
-              if (gatewayResult is AuthBackendResult.DemoValidationPassed) {
-                demoDialogNormalizedPhone = gatewayResult.normalizedPhone
-              }
-            }
+            val passwordChars = password.toCharArray()
+            onRegisterSubmit(
+              fullName.trim(),
+              result.normalizedPhone,
+              emailInput.trim().ifEmpty { null },
+              passwordChars,
+              selectedRole
+            )
           }
         },
+        enabled = !isLoading,
         modifier = Modifier
           .fillMaxWidth()
           .height(58.dp)
@@ -542,14 +588,24 @@ fun RegistrationScreen(
         ),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
       ) {
-        Text(
-          text = DwelloStrings.createAccountBtn(currentLanguage),
-          style = MaterialTheme.typography.titleMedium.copy(
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 17.sp,
-            color = Color.White
+        if (isLoading) {
+          CircularProgressIndicator(
+            color = Color.White,
+            strokeWidth = 2.5.dp,
+            modifier = Modifier
+              .size(24.dp)
+              .testTag("register_loading_indicator")
           )
-        )
+        } else {
+          Text(
+            text = DwelloStrings.createAccountBtn(currentLanguage),
+            style = MaterialTheme.typography.titleMedium.copy(
+              fontWeight = FontWeight.ExtraBold,
+              fontSize = 17.sp,
+              color = Color.White
+            )
+          )
+        }
       }
 
       Spacer(modifier = Modifier.height(12.dp))
@@ -561,6 +617,7 @@ fun RegistrationScreen(
       ) {
         TextButton(
           onClick = onNavigateToLogin,
+          enabled = !isLoading,
           modifier = Modifier
             .heightIn(min = 48.dp)
             .testTag("register_already_have_account_link")
@@ -579,59 +636,13 @@ fun RegistrationScreen(
     }
   }
 
-  // Honest Frontend Demonstration Dialog (Never fakes real account creation)
-  demoDialogNormalizedPhone?.let { normalizedPhone ->
-    AlertDialog(
-      onDismissRequest = { demoDialogNormalizedPhone = null },
-      title = {
-        Text(
-          text = DwelloStrings.registrationDemoDialogTitle(currentLanguage),
-          fontWeight = FontWeight.Bold,
-          color = DeepNavyText
-        )
-      },
-      text = {
-        Text(
-          text = DwelloStrings.registrationDemoDialogBody(currentLanguage, normalizedPhone),
-          style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText, lineHeight = 20.sp)
-        )
-      },
-      confirmButton = {
-        Button(
-          onClick = {
-            demoDialogNormalizedPhone = null
-            onPreviewAuthenticatedRole(selectedRole)
-          },
-          colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
-        ) {
-          Text(
-            text = if (selectedRole == AuthAccountRole.TENANT)
-              (if (currentLanguage == AppLanguage.ENGLISH) "Preview Tenant Home" else "Open Tenant Home")
-            else
-              (if (currentLanguage == AppLanguage.ENGLISH) "Preview Landlord Dashboard" else "Open Landlord Office"),
-            color = Color.White,
-            fontWeight = FontWeight.Bold
-          )
-        }
-      },
-      dismissButton = {
-        TextButton(onClick = { demoDialogNormalizedPhone = null }) {
-          Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH) "Stay Here" else "Stay Here",
-            color = NavyTextSecondary
-          )
-        }
-      }
-    )
-  }
-
   // Terms & Privacy Summary Dialog
   if (showTermsDialog) {
     AlertDialog(
       onDismissRequest = { showTermsDialog = false },
       title = {
         Text(
-          text = if (currentLanguage == AppLanguage.ENGLISH) "Terms & Privacy Summary" else "Terms & Privacy Summary",
+          text = "Terms & Privacy Summary",
           fontWeight = FontWeight.Bold,
           color = DeepNavyText
         )
@@ -639,9 +650,9 @@ fun RegistrationScreen(
       text = {
         Text(
           text = if (currentLanguage == AppLanguage.ENGLISH)
-            "• Dwello Homes connects Tenants and Landlords in Benin City without public middlemen or agents.\n• Private landlord phone numbers are never publicly exposed to other users.\n• All submitted properties start as Pending Approval and are moderated before going live.\n• Your phone number will be used for account verification once backend SMS/OTP integration is connected."
+            "• Dwello Homes connects Tenants and Landlords in Benin City without public middlemen or agents.\n• Private landlord phone numbers are never publicly exposed to other users.\n• All submitted properties start as Pending Approval and are moderated before going live.\n• Your session token is stored encrypted on your device using Android Keystore."
           else
-            "• Dwello Homes dey connect Tenants and Landlords for Benin City without agent.\n• Private landlord phone number no dey show outside for public.\n• Any new house go start as Pending Approval before e go live.\n• Your phone number go use for OTP verification once backend connect.",
+            "• Dwello Homes dey connect Tenants and Landlords for Benin City without agent.\n• Private landlord phone number no dey show outside for public.\n• Any new house go start as Pending Approval before e go live.\n• Your login session token dey protected with Android Keystore encryption.",
           style = MaterialTheme.typography.bodyMedium.copy(color = DeepNavyText, lineHeight = 20.sp)
         )
       },
@@ -654,7 +665,7 @@ fun RegistrationScreen(
           colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
         ) {
           Text(
-            text = if (currentLanguage == AppLanguage.ENGLISH) "Accept & Close" else "Accept & Close",
+            text = "Accept & Close",
             color = Color.White,
             fontWeight = FontWeight.Bold
           )

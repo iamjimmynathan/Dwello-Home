@@ -32,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,9 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AppLanguage
-import com.example.data.AuthBackendResult
 import com.example.data.AuthFormValidator
-import com.example.data.DemoAuthGateway
 import com.example.data.DwelloStrings
 import com.example.data.ForgotPasswordValidationResult
 import com.example.ui.components.AuthTopBar
@@ -57,7 +54,6 @@ import com.example.ui.theme.SkyBluePrimary
 import com.example.ui.theme.SoftBlueAccent
 import com.example.ui.theme.SoftBlueBorder
 import com.example.ui.theme.VeryLightBlueBackground
-import kotlinx.coroutines.launch
 
 @Composable
 fun ForgotPasswordScreen(
@@ -67,8 +63,6 @@ fun ForgotPasswordScreen(
   modifier: Modifier = Modifier
 ) {
   BackHandler(onBack = onBackToLogin)
-
-  val scope = rememberCoroutineScope()
 
   var phoneInput by remember { mutableStateOf("") }
   var validationResult by remember { mutableStateOf<ForgotPasswordValidationResult?>(null) }
@@ -156,12 +150,7 @@ fun ForgotPasswordScreen(
           )
           validationResult = result
           if (result.isValid && result.normalizedPhone != null) {
-            scope.launch {
-              val response = DemoAuthGateway.requestPasswordResetOtp(result.normalizedPhone)
-              if (response is AuthBackendResult.BackendNotConnected) {
-                submittedNormalizedPhone = result.normalizedPhone
-              }
-            }
+            submittedNormalizedPhone = result.normalizedPhone
           }
         },
         modifier = Modifier
@@ -185,7 +174,6 @@ fun ForgotPasswordScreen(
         )
       }
 
-      // Honest Backend/OTP Pending Explanation (No fake OTP code or simulated SMS)
       submittedNormalizedPhone?.let { normalizedPhone ->
         Spacer(modifier = Modifier.height(20.dp))
         Surface(
@@ -217,10 +205,7 @@ fun ForgotPasswordScreen(
             Spacer(modifier = Modifier.width(12.dp))
             Column {
               Text(
-                text = if (currentLanguage == AppLanguage.ENGLISH)
-                  "Phone Number Ready ($normalizedPhone)"
-                else
-                  "Phone Number Ready ($normalizedPhone)",
+                text = "Account Recovery ($normalizedPhone)",
                 style = MaterialTheme.typography.titleSmall.copy(
                   fontWeight = FontWeight.Bold,
                   color = DeepNavyText
@@ -228,7 +213,10 @@ fun ForgotPasswordScreen(
               )
               Spacer(modifier = Modifier.height(4.dp))
               Text(
-                text = DwelloStrings.otpBackendPendingNotice(currentLanguage),
+                text = if (currentLanguage == AppLanguage.ENGLISH)
+                  "Self-service SMS OTP password reset is not yet enabled on the server. Please contact Dwello Homes Benin Support (0800-393-556) to verify your account and reset your password."
+                else
+                  "SMS OTP password reset never enable on server yet. Please call Dwello Homes Benin Support (0800-393-556) to verify your account and reset password.",
                 style = MaterialTheme.typography.bodySmall.copy(
                   color = DeepNavyText,
                   lineHeight = 19.sp

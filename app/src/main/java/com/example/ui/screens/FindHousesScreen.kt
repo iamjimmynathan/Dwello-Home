@@ -1,9 +1,6 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -35,23 +32,27 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ElectricBolt
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -82,14 +83,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.data.AppLanguage
+import com.example.data.AuthenticatedUser
 import com.example.data.DwelloStrings
-import com.example.data.EnquiryItem
-import com.example.data.EnquiryRepository
 import com.example.data.PropertyApprovalStatus
 import com.example.data.PropertyItem
 import com.example.data.RentalPeriod
 import com.example.data.SamplePropertyData
+import com.example.ui.AsyncResourceState
 import com.example.ui.components.DwelloHeader
 import com.example.ui.theme.CardBorderSubtle
 import com.example.ui.theme.CardSurfaceWhite
@@ -108,21 +110,36 @@ import com.example.ui.theme.WarmAmberAccent
 fun FindHousesScreen(
   currentLanguage: AppLanguage,
   initialSearchQuery: String?,
+  propertiesState: AsyncResourceState<List<PropertyItem>>,
+  favouriteIds: Set<String>,
+  favouriteActionIds: Set<String>,
+  selectedPropertyDetailState: AsyncResourceState<PropertyItem>?,
+  currentUser: AuthenticatedUser?,
+  enquirySubmitting: Boolean,
+  enquirySubmitError: String?,
+  enquirySubmittedSuccess: Boolean,
   onLanguageToggle: () -> Unit,
+  onRetryLoadProperties: () -> Unit,
+  onToggleFavourite: (String) -> Unit,
+  onOpenPropertyDetails: (PropertyItem) -> Unit,
+  onClosePropertyDetails: () -> Unit,
+  onSubmitEnquiry: (propertyId: String, message: String?, preferredInspectionDate: String?) -> Unit,
+  onResetEnquiryState: () -> Unit,
   onOpenMessageWithLandlord: (PropertyItem) -> Unit,
   modifier: Modifier = Modifier
 ) {
   // Search & Filter State
   var searchQuery by remember(initialSearchQuery) { mutableStateOf(initialSearchQuery ?: "") }
   var selectedAreaQuickFilter by remember { mutableStateOf<String?>(null) }
+  var showFavouritesOnly by remember { mutableStateOf(false) }
   var selectedPropertyType by remember { mutableStateOf("All") }
-  var selectedRentalPeriod by remember { mutableStateOf<RentalPeriod?>(null) } // null = All
+  var selectedRentalPeriod by remember { mutableStateOf<RentalPeriod?>(null) }
   var minRentInput by remember { mutableStateOf("") }
   var maxRentInput by remember { mutableStateOf("") }
   var showFilterSheet by remember { mutableStateOf(false) }
 
   // Details & Enquiry View State
-  var viewingPropertyDetails by remember { mutableStateOf<PropertyItem?>(null) }
+  var lastRequestedDetailSummary by remember { mutableStateOf<PropertyItem?>(null) }
   var enquiryProperty by remember { mutableStateOf<PropertyItem?>(null) }
 
   val beninQuickAreas = listOf(
@@ -138,12 +155,15 @@ fun FindHousesScreen(
     "Ogida"
   )
 
-  // Critical Business Rule: PUBLIC SEARCH ONLY SHOWS APPROVED PROPERTIES!
-  // Pending Approval, Rejected, and Unavailable properties are strictly filtered out.
-  val approvedProperties = SamplePropertyData.getApprovedPublicProperties()
+  // Public search ONLY shows APPROVED properties returned from GET /api/properties
+  val approvedProperties = when (propertiesState) {
+    is AsyncResourceState.Success -> propertiesState.data.filter {
+      it.approvalStatus == PropertyApprovalStatus.APPROVED
+    }
+    else -> emptyList()
+  }
 
   val filteredProperties = approvedProperties.filter { item ->
-    // 1. Text Search matching title, area, neighbourhood, or description
     val matchesSearch = searchQuery.isBlank() ||
       item.area.contains(searchQuery, ignoreCase = true) ||
       item.titleEn.contains(searchQuery, ignoreCase = true) ||
@@ -151,31 +171,27 @@ fun FindHousesScreen(
       item.neighborhoodNote.contains(searchQuery, ignoreCase = true) ||
       item.categoryEn.contains(searchQuery, ignoreCase = true)
 
-    // 2. Quick Area Chip Filter
     val matchesAreaChip = selectedAreaQuickFilter == null || item.area.equals(selectedAreaQuickFilter, ignoreCase = true)
-
-    // 3. Property Type Filter
+    val matchesFav = !showFavouritesOnly || favouriteIds.contains(item.id)
     val matchesType = selectedPropertyType == "All" || item.categoryEn.equals(selectedPropertyType, ignoreCase = true)
-
-    // 4. Rental Period Filter
     val matchesPeriod = selectedRentalPeriod == null || item.rentalPeriod == selectedRentalPeriod
-
-    // 5. Min / Max Rent Filter
     val minRent = minRentInput.filter { it.isDigit() }.toLongOrNull() ?: 0L
     val maxRent = maxRentInput.filter { it.isDigit() }.toLongOrNull() ?: Long.MAX_VALUE
     val matchesBudget = item.priceNaira in minRent..maxRent
 
-    matchesSearch && matchesAreaChip && matchesType && matchesPeriod && matchesBudget
+    matchesSearch && matchesAreaChip && matchesFav && matchesType && matchesPeriod && matchesBudget
   }
 
   val hasActiveFilters = selectedPropertyType != "All" ||
     selectedRentalPeriod != null ||
     minRentInput.isNotBlank() ||
     maxRentInput.isNotBlank() ||
-    selectedAreaQuickFilter != null
+    selectedAreaQuickFilter != null ||
+    showFavouritesOnly
 
   fun resetAllFilters() {
     selectedAreaQuickFilter = null
+    showFavouritesOnly = false
     selectedPropertyType = "All"
     selectedRentalPeriod = null
     minRentInput = ""
@@ -183,10 +199,9 @@ fun FindHousesScreen(
     searchQuery = ""
   }
 
-  // Handle back press when viewing details or enquiry
-  if (viewingPropertyDetails != null) {
+  if (selectedPropertyDetailState != null) {
     BackHandler {
-      viewingPropertyDetails = null
+      onClosePropertyDetails()
     }
   }
 
@@ -216,7 +231,6 @@ fun FindHousesScreen(
               .background(VeryLightBlueBackground)
               .padding(horizontal = 20.dp, vertical = 18.dp)
           ) {
-            // Default location indicator badge
             Surface(
               color = Color.White,
               shape = RoundedCornerShape(20.dp),
@@ -246,7 +260,6 @@ fun FindHousesScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Main Title: "Find your next home"
             Text(
               text = DwelloStrings.findScreenTitle(currentLanguage),
               style = MaterialTheme.typography.headlineSmall.copy(
@@ -257,7 +270,6 @@ fun FindHousesScreen(
               modifier = Modifier.testTag("find_screen_title")
             )
 
-            // Subtitle: "Let's find a place you'll love."
             Text(
               text = DwelloStrings.findScreenSubtitle(currentLanguage),
               style = MaterialTheme.typography.bodyMedium.copy(
@@ -269,7 +281,7 @@ fun FindHousesScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 3. Search Box: "Search by area or neighbourhood"
+            // 3. Search Box + Filter Sheet Button
             Row(
               modifier = Modifier.fillMaxWidth(),
               verticalAlignment = Alignment.CenterVertically
@@ -321,7 +333,6 @@ fun FindHousesScreen(
 
               Spacer(modifier = Modifier.width(10.dp))
 
-              // Filter Sheet Button with Badge if filters are active
               Surface(
                 modifier = Modifier
                   .size(54.dp)
@@ -346,7 +357,7 @@ fun FindHousesScreen(
           }
         }
 
-        // 4. Benin City Neighbourhood Quick-Filter Chips
+        // 4. Saved Favourites + Benin City Neighbourhood Quick-Filter Chips
         item {
           Column(
             modifier = Modifier
@@ -367,9 +378,12 @@ fun FindHousesScreen(
                   color = DeepNavyText
                 )
               )
-              if (selectedAreaQuickFilter != null) {
+              if (selectedAreaQuickFilter != null || showFavouritesOnly) {
                 TextButton(
-                  onClick = { selectedAreaQuickFilter = null },
+                  onClick = {
+                    selectedAreaQuickFilter = null
+                    showFavouritesOnly = false
+                  },
                   contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                   Text(
@@ -389,6 +403,41 @@ fun FindHousesScreen(
               contentPadding = PaddingValues(horizontal = 20.dp),
               horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+              item {
+                Surface(
+                  modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { showFavouritesOnly = !showFavouritesOnly }
+                    .testTag("quick_favourites_chip"),
+                  color = if (showFavouritesOnly) Color(0xFFE11D48) else Color.White,
+                  shape = RoundedCornerShape(20.dp),
+                  border = BorderStroke(
+                    1.dp,
+                    if (showFavouritesOnly) Color(0xFFE11D48) else SoftBlueBorder
+                  )
+                ) {
+                  Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                  ) {
+                    Icon(
+                      imageVector = if (showFavouritesOnly) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                      contentDescription = null,
+                      tint = if (showFavouritesOnly) Color.White else Color(0xFFE11D48),
+                      modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                      text = "${DwelloStrings.savedFavouritesLabel(currentLanguage)} (${favouriteIds.size})",
+                      style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = if (showFavouritesOnly) Color.White else DeepNavyText
+                      )
+                    )
+                  }
+                }
+              }
+
               items(beninQuickAreas) { area ->
                 val isSelected = selectedAreaQuickFilter == area
                 Surface(
@@ -517,74 +566,173 @@ fun FindHousesScreen(
           }
         }
 
-        // 7. Property Cards List
-        if (filteredProperties.isEmpty()) {
-          item {
-            Card(
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 20.dp)
-                .testTag("no_results_card"),
-              shape = RoundedCornerShape(16.dp),
-              colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
-              border = BorderStroke(1.dp, SoftBlueBorder)
-            ) {
-              Column(
+        // 7. Property Cards List / Loading / Error / Empty
+        when (propertiesState) {
+          is AsyncResourceState.Idle,
+          is AsyncResourceState.Loading -> {
+            item {
+              Card(
                 modifier = Modifier
                   .fillMaxWidth()
-                  .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                  .padding(horizontal = 20.dp, vertical = 16.dp)
+                  .testTag("find_houses_loading"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
+                border = BorderStroke(1.dp, SoftBlueBorder)
               ) {
-                Icon(
-                  imageVector = Icons.Default.Search,
-                  contentDescription = null,
-                  tint = SkyBluePrimary,
-                  modifier = Modifier.size(48.dp)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                  text = if (currentLanguage == AppLanguage.ENGLISH)
-                    "No approved properties found matching your search."
-                  else
-                    "House never dey for this area or filter yet.",
-                  style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = DeepNavyText
-                  )
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                  text = if (currentLanguage == AppLanguage.ENGLISH)
-                    "Try resetting your budget or neighbourhood filters to see more homes in Benin City."
-                  else
-                    "Change your budget or area filter make you fit see other houses for Benin City.",
-                  style = MaterialTheme.typography.bodySmall.copy(
-                    color = NavyTextSecondary
-                  )
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                  onClick = { resetAllFilters() },
-                  colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
-                  shape = RoundedCornerShape(12.dp)
+                Column(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                  CircularProgressIndicator(color = SkyBluePrimary)
+                  Spacer(modifier = Modifier.height(12.dp))
                   Text(
-                    text = DwelloStrings.resetFilters(currentLanguage),
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                    text = DwelloStrings.loadingPropertiesLabel(currentLanguage),
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                      color = DeepNavyText,
+                      fontWeight = FontWeight.SemiBold
+                    )
                   )
                 }
               }
             }
           }
-        } else {
-          items(filteredProperties) { property ->
-            DiscoveryPropertyCard(
-              property = property,
-              currentLanguage = currentLanguage,
-              onViewDetails = { viewingPropertyDetails = property },
-              onSendEnquiry = { enquiryProperty = property },
-              modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-            )
+
+          is AsyncResourceState.Error -> {
+            item {
+              Card(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(horizontal = 20.dp, vertical = 16.dp)
+                  .testTag("find_houses_error_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+                border = BorderStroke(1.dp, Color(0xFFFECACA))
+              ) {
+                Column(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                  horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = Color(0xFFDC2626),
+                    modifier = Modifier.size(36.dp)
+                  )
+                  Spacer(modifier = Modifier.height(10.dp))
+                  Text(
+                    text = propertiesState.message,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                      color = Color(0xFF991B1B),
+                      fontWeight = FontWeight.Medium
+                    )
+                  )
+                  Spacer(modifier = Modifier.height(14.dp))
+                  Button(
+                    onClick = onRetryLoadProperties,
+                    colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("find_houses_retry_button")
+                  ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(DwelloStrings.retryLabel(currentLanguage), fontWeight = FontWeight.Bold)
+                  }
+                }
+              }
+            }
+          }
+
+          is AsyncResourceState.Success -> {
+            if (filteredProperties.isEmpty()) {
+              item {
+                Card(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 20.dp)
+                    .testTag("no_results_card"),
+                  shape = RoundedCornerShape(16.dp),
+                  colors = CardDefaults.cardColors(containerColor = VeryLightBlueBackground),
+                  border = BorderStroke(1.dp, SoftBlueBorder)
+                ) {
+                  Column(
+                    modifier = Modifier
+                      .fillMaxWidth()
+                      .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                  ) {
+                    Icon(
+                      imageVector = Icons.Default.Search,
+                      contentDescription = null,
+                      tint = SkyBluePrimary,
+                      modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                      text = if (showFavouritesOnly) {
+                        if (currentLanguage == AppLanguage.ENGLISH)
+                          "No saved properties yet."
+                        else
+                          "You never save any house yet."
+                      } else {
+                        if (currentLanguage == AppLanguage.ENGLISH)
+                          "No approved properties found matching your search."
+                        else
+                          "House never dey for this area or filter yet."
+                      },
+                      style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = DeepNavyText
+                      )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                      text = if (currentLanguage == AppLanguage.ENGLISH)
+                        "Try resetting your budget or neighbourhood filters to see more homes in Benin City."
+                      else
+                        "Change your budget or area filter make you fit see other houses for Benin City.",
+                      style = MaterialTheme.typography.bodySmall.copy(
+                        color = NavyTextSecondary
+                      )
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                      onClick = { resetAllFilters() },
+                      colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
+                      shape = RoundedCornerShape(12.dp)
+                    ) {
+                      Text(
+                        text = DwelloStrings.resetFilters(currentLanguage),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                      )
+                    }
+                  }
+                }
+              }
+            } else {
+              items(filteredProperties, key = { it.id }) { property ->
+                DiscoveryPropertyCard(
+                  property = property,
+                  currentLanguage = currentLanguage,
+                  isFavourite = favouriteIds.contains(property.id),
+                  isFavouriteLoading = favouriteActionIds.contains(property.id),
+                  onToggleFavourite = { onToggleFavourite(property.id) },
+                  onViewDetails = {
+                    lastRequestedDetailSummary = property
+                    onOpenPropertyDetails(property)
+                  },
+                  onSendEnquiry = {
+                    onResetEnquiryState()
+                    enquiryProperty = property
+                  },
+                  modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                )
+              }
+            }
           }
         }
       }
@@ -616,45 +764,58 @@ fun FindHousesScreen(
       }
     }
 
-    // Property Details Full-Screen Overlay
-    viewingPropertyDetails?.let { property ->
-      PropertyDetailsView(
-        property = property,
+    // Property Details Full-Screen Overlay (GET /api/properties/{id})
+    selectedPropertyDetailState?.let { detailState ->
+      PropertyDetailsOverlay(
+        detailState = detailState,
         currentLanguage = currentLanguage,
-        onBack = { viewingPropertyDetails = null },
-        onSendEnquiry = {
-          enquiryProperty = property
+        favouriteIds = favouriteIds,
+        favouriteActionIds = favouriteActionIds,
+        onToggleFavourite = onToggleFavourite,
+        onBack = onClosePropertyDetails,
+        onRetry = {
+          lastRequestedDetailSummary?.let { onOpenPropertyDetails(it) }
+        },
+        onSendEnquiry = { prop ->
+          onResetEnquiryState()
+          enquiryProperty = prop
         }
       )
     }
 
-    // Enquiry Submission Dialog
+    // Enquiry Submission Dialog (POST /api/enquiries)
     enquiryProperty?.let { property ->
       EnquiryFormDialog(
         property = property,
         currentLanguage = currentLanguage,
-        onDismiss = { enquiryProperty = null }
+        currentUser = currentUser,
+        isSubmitting = enquirySubmitting,
+        submitError = enquirySubmitError,
+        isSubmitted = enquirySubmittedSuccess,
+        onSubmit = { date, message ->
+          onSubmitEnquiry(property.id, message, date)
+        },
+        onDismiss = {
+          onResetEnquiryState()
+          enquiryProperty = null
+        },
+        onViewEnquiries = {
+          onResetEnquiryState()
+          enquiryProperty = null
+          onOpenMessageWithLandlord(property)
+        }
       )
     }
   }
 }
 
-/**
- * Property Discovery Card complying with all required specifications:
- * - Property photograph
- * - Property title
- * - Neighbourhood
- * - Rental price in Nigerian Naira (₦)
- * - Rental period (Yearly / Monthly)
- * - Number of bedrooms & bathrooms
- * - Property type chip
- * - VIEW DETAILS button
- * - Clearly marked as demonstration listing
- */
 @Composable
 fun DiscoveryPropertyCard(
   property: PropertyItem,
   currentLanguage: AppLanguage,
+  isFavourite: Boolean,
+  isFavouriteLoading: Boolean,
+  onToggleFavourite: () -> Unit,
   onViewDetails: () -> Unit,
   onSendEnquiry: () -> Unit,
   modifier: Modifier = Modifier
@@ -677,14 +838,25 @@ fun DiscoveryPropertyCard(
           .fillMaxWidth()
           .height(170.dp)
       ) {
-        Image(
-          painter = painterResource(id = property.imageResId),
-          contentDescription = property.titleEn,
-          modifier = Modifier.fillMaxSize(),
-          contentScale = ContentScale.Crop
-        )
+        if (property.photoUris.isNotEmpty()) {
+          AsyncImage(
+            model = property.photoUris.first(),
+            contentDescription = property.titleEn,
+            placeholder = painterResource(id = property.imageResId),
+            error = painterResource(id = property.imageResId),
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+          )
+        } else {
+          Image(
+            painter = painterResource(id = property.imageResId),
+            contentDescription = property.titleEn,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+          )
+        }
 
-        // Demonstration Data Pill (Clearly identifies demonstration listing)
+        // Verified Listing Pill
         Surface(
           modifier = Modifier
             .padding(10.dp)
@@ -697,14 +869,14 @@ fun DiscoveryPropertyCard(
             verticalAlignment = Alignment.CenterVertically
           ) {
             Icon(
-              imageVector = Icons.Default.Info,
+              imageVector = Icons.Default.Verified,
               contentDescription = null,
               tint = Color.White,
               modifier = Modifier.size(12.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-              text = if (currentLanguage == AppLanguage.ENGLISH) "Demo Listing" else "Demo House",
+              text = DwelloStrings.verifiedListingLabel(currentLanguage),
               style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = 10.sp,
                 color = Color.White,
@@ -732,6 +904,39 @@ fun DiscoveryPropertyCard(
             )
           )
         }
+
+        // Favourite Button
+        Surface(
+          modifier = Modifier
+            .padding(10.dp)
+            .align(Alignment.BottomEnd),
+          color = Color.White.copy(alpha = 0.94f),
+          shape = CircleShape,
+          shadowElevation = 2.dp
+        ) {
+          IconButton(
+            onClick = onToggleFavourite,
+            enabled = !isFavouriteLoading,
+            modifier = Modifier
+              .size(44.dp)
+              .testTag("favourite_toggle_btn_${property.id}")
+          ) {
+            if (isFavouriteLoading) {
+              CircularProgressIndicator(
+                color = SkyBluePrimary,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(18.dp)
+              )
+            } else {
+              Icon(
+                imageVector = if (isFavourite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = if (isFavourite) "Remove favourite" else "Add favourite",
+                tint = if (isFavourite) Color(0xFFE11D48) else DeepNavyText,
+                modifier = Modifier.size(22.dp)
+              )
+            }
+          }
+        }
       }
 
       // 2. Card Content
@@ -740,13 +945,11 @@ fun DiscoveryPropertyCard(
           .fillMaxWidth()
           .padding(14.dp)
       ) {
-        // Location & Price Row
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.SpaceBetween,
           verticalAlignment = Alignment.CenterVertically
         ) {
-          // Neighbourhood badge
           Surface(
             color = SoftBlueAccent,
             shape = RoundedCornerShape(8.dp)
@@ -772,7 +975,6 @@ fun DiscoveryPropertyCard(
             }
           }
 
-          // Price in Naira with period
           Row(verticalAlignment = Alignment.Bottom) {
             Text(
               text = property.priceFormatted,
@@ -797,7 +999,6 @@ fun DiscoveryPropertyCard(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Property Title
         Text(
           text = if (currentLanguage == AppLanguage.ENGLISH) property.titleEn else property.titlePidgin,
           style = MaterialTheme.typography.titleSmall.copy(
@@ -809,9 +1010,8 @@ fun DiscoveryPropertyCard(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // Neighbourhood note
         Text(
-          text = "📍 ${property.neighborhoodNote}, Benin City",
+          text = "${property.neighborhoodNote}, Benin City",
           style = MaterialTheme.typography.bodySmall.copy(
             color = NavyTextSecondary,
             fontWeight = FontWeight.Medium
@@ -820,13 +1020,11 @@ fun DiscoveryPropertyCard(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Specs: Bedrooms, Bathrooms, Water, Light
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(14.dp),
           verticalAlignment = Alignment.CenterVertically
         ) {
-          // Bedrooms
           Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
               imageVector = Icons.Default.Bed,
@@ -844,7 +1042,6 @@ fun DiscoveryPropertyCard(
             )
           }
 
-          // Bathrooms
           Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
               imageVector = Icons.Default.Bathtub,
@@ -899,18 +1096,16 @@ fun DiscoveryPropertyCard(
         HorizontalDivider(color = SoftBlueBorder.copy(alpha = 0.6f))
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Action Buttons Row: VIEW DETAILS and SEND ENQUIRY
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(10.dp),
           verticalAlignment = Alignment.CenterVertically
         ) {
-          // VIEW DETAILS button
           OutlinedButton(
             onClick = onViewDetails,
             modifier = Modifier
               .weight(1f)
-              .height(46.dp)
+              .height(48.dp)
               .testTag("view_details_btn_${property.id}"),
             shape = RoundedCornerShape(10.dp),
             border = BorderStroke(1.5.dp, SkyBluePrimary),
@@ -935,12 +1130,11 @@ fun DiscoveryPropertyCard(
             )
           }
 
-          // SEND ENQUIRY button
           Button(
             onClick = onSendEnquiry,
             modifier = Modifier
               .weight(1f)
-              .height(46.dp)
+              .height(48.dp)
               .testTag("enquire_card_btn_${property.id}"),
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(
@@ -966,13 +1160,6 @@ fun DiscoveryPropertyCard(
   }
 }
 
-/**
- * Filter Sheet Content allowing tenants to filter by:
- * - Property Type
- * - Rent Budget (Min & Max in ₦)
- * - Rental Period (Yearly / Monthly)
- * - Apply & Reset buttons
- */
 @Composable
 fun FilterSheetContent(
   currentLanguage: AppLanguage,
@@ -992,7 +1179,6 @@ fun FilterSheetContent(
       .fillMaxWidth()
       .padding(horizontal = 24.dp, vertical = 16.dp)
   ) {
-    // Sheet Header
     Row(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.SpaceBetween,
@@ -1017,7 +1203,6 @@ fun FilterSheetContent(
 
     Spacer(modifier = Modifier.height(16.dp))
 
-    // 1. PROPERTY TYPE
     Text(
       text = DwelloStrings.propertyTypeLabel(currentLanguage),
       style = MaterialTheme.typography.titleSmall.copy(
@@ -1057,7 +1242,6 @@ fun FilterSheetContent(
 
     Spacer(modifier = Modifier.height(20.dp))
 
-    // 2. RENT BUDGET (₦)
     Text(
       text = DwelloStrings.rentBudgetLabel(currentLanguage),
       style = MaterialTheme.typography.titleSmall.copy(
@@ -1110,7 +1294,6 @@ fun FilterSheetContent(
 
     Spacer(modifier = Modifier.height(20.dp))
 
-    // 3. RENTAL PERIOD
     Text(
       text = DwelloStrings.rentalPeriodLabel(currentLanguage),
       style = MaterialTheme.typography.titleSmall.copy(
@@ -1124,7 +1307,6 @@ fun FilterSheetContent(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-      // Option: All Periods
       val isAllPeriod = selectedRentalPeriod == null
       Surface(
         modifier = Modifier
@@ -1150,7 +1332,6 @@ fun FilterSheetContent(
         }
       }
 
-      // Option: Yearly
       val isYearly = selectedRentalPeriod == RentalPeriod.YEARLY
       Surface(
         modifier = Modifier
@@ -1176,7 +1357,6 @@ fun FilterSheetContent(
         }
       }
 
-      // Option: Monthly
       val isMonthly = selectedRentalPeriod == RentalPeriod.MONTHLY
       Surface(
         modifier = Modifier
@@ -1205,7 +1385,6 @@ fun FilterSheetContent(
 
     Spacer(modifier = Modifier.height(26.dp))
 
-    // APPLY FILTER BUTTON
     Button(
       onClick = onApplyFilters,
       modifier = Modifier
@@ -1231,28 +1410,129 @@ fun FilterSheetContent(
   }
 }
 
-/**
- * Dedicated Property Details View meeting all specifications:
- * - Multiple property photographs with interactive thumbnail selector
- * - Property title, Location, Rental price & period
- * - Bedrooms & Bathrooms
- * - Property type
- * - Comprehensive description
- * - Available facilities
- * - Rental terms
- * - Availability status
- * - Prominent "SEND ENQUIRY TO DWELLO HOMES" button
- * - Zero landlord private phone exposure
- */
+@Composable
+fun PropertyDetailsOverlay(
+  detailState: AsyncResourceState<PropertyItem>,
+  currentLanguage: AppLanguage,
+  favouriteIds: Set<String>,
+  favouriteActionIds: Set<String>,
+  onToggleFavourite: (String) -> Unit,
+  onBack: () -> Unit,
+  onRetry: () -> Unit,
+  onSendEnquiry: (PropertyItem) -> Unit
+) {
+  when (detailState) {
+    is AsyncResourceState.Idle,
+    is AsyncResourceState.Loading -> {
+      Column(
+        modifier = Modifier
+          .fillMaxSize()
+          .background(MainBackgroundWhite)
+          .testTag("property_details_loading")
+      ) {
+        Surface(color = Color.White, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            IconButton(onClick = onBack, modifier = Modifier.testTag("details_back_button")) {
+              Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DeepNavyText)
+            }
+            Text(
+              text = if (currentLanguage == AppLanguage.ENGLISH) "Property Details" else "House Details",
+              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = DeepNavyText)
+            )
+          }
+        }
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+          Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(color = SkyBluePrimary)
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("Loading property details...", color = NavyTextSecondary)
+          }
+        }
+      }
+    }
+
+    is AsyncResourceState.Error -> {
+      Column(
+        modifier = Modifier
+          .fillMaxSize()
+          .background(MainBackgroundWhite)
+      ) {
+        Surface(color = Color.White, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            IconButton(onClick = onBack, modifier = Modifier.testTag("details_back_button")) {
+              Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = DeepNavyText)
+            }
+            Text(
+              text = if (currentLanguage == AppLanguage.ENGLISH) "Property Details" else "House Details",
+              style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = DeepNavyText)
+            )
+          }
+        }
+        Box(
+          modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+          contentAlignment = Alignment.Center
+        ) {
+          Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFDC2626), modifier = Modifier.size(40.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+              text = detailState.message,
+              style = MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF991B1B), fontWeight = FontWeight.SemiBold)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+              onClick = onRetry,
+              colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
+              modifier = Modifier.testTag("property_details_retry_btn")
+            ) {
+              Text(DwelloStrings.retryLabel(currentLanguage))
+            }
+          }
+        }
+      }
+    }
+
+    is AsyncResourceState.Success -> {
+      val property = detailState.data
+      PropertyDetailsView(
+        property = property,
+        currentLanguage = currentLanguage,
+        isFavourite = favouriteIds.contains(property.id),
+        isFavouriteLoading = favouriteActionIds.contains(property.id),
+        onToggleFavourite = { onToggleFavourite(property.id) },
+        onBack = onBack,
+        onSendEnquiry = { onSendEnquiry(property) }
+      )
+    }
+  }
+}
+
 @Composable
 fun PropertyDetailsView(
   property: PropertyItem,
   currentLanguage: AppLanguage,
+  isFavourite: Boolean,
+  isFavouriteLoading: Boolean,
+  onToggleFavourite: () -> Unit,
   onBack: () -> Unit,
   onSendEnquiry: () -> Unit
 ) {
-  var selectedPhotoIndex by remember { mutableIntStateOf(0) }
-  val photos = property.imageResList.ifEmpty { listOf(property.imageResId) }
+  var selectedPhotoIndex by remember(property.id) { mutableIntStateOf(0) }
+  val remoteUrls = property.photoUris
+  val fallbackResList = property.imageResList.ifEmpty { listOf(property.imageResId) }
+  val totalPhotos = if (remoteUrls.isNotEmpty()) remoteUrls.size else fallbackResList.size
 
   Box(
     modifier = Modifier
@@ -1265,7 +1545,7 @@ fun PropertyDetailsView(
         .testTag("property_details_scroll"),
       contentPadding = PaddingValues(bottom = 90.dp)
     ) {
-      // 1. Top Bar with Back Button & Title
+      // 1. Top Bar with Back Button & Favourite Action
       item {
         Surface(
           modifier = Modifier.fillMaxWidth(),
@@ -1299,6 +1579,26 @@ fun PropertyDetailsView(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            IconButton(
+              onClick = onToggleFavourite,
+              enabled = !isFavouriteLoading,
+              modifier = Modifier.testTag("details_favourite_btn_${property.id}")
+            ) {
+              if (isFavouriteLoading) {
+                CircularProgressIndicator(
+                  color = SkyBluePrimary,
+                  strokeWidth = 2.dp,
+                  modifier = Modifier.size(20.dp)
+                )
+              } else {
+                Icon(
+                  imageVector = if (isFavourite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                  contentDescription = if (isFavourite) "Remove saved property" else "Save property",
+                  tint = if (isFavourite) Color(0xFFE11D48) else DeepNavyText
+                )
+              }
+            }
+
             Surface(
               color = SoftBlueAccent,
               shape = RoundedCornerShape(12.dp)
@@ -1319,20 +1619,29 @@ fun PropertyDetailsView(
       // 2. Multiple Property Photographs Hero & Gallery Thumbnails
       item {
         Column(modifier = Modifier.fillMaxWidth()) {
-          // Large Main Photo
           Box(
             modifier = Modifier
               .fillMaxWidth()
               .height(240.dp)
           ) {
-            Image(
-              painter = painterResource(id = photos[selectedPhotoIndex.coerceIn(photos.indices)]),
-              contentDescription = property.titleEn,
-              modifier = Modifier.fillMaxSize(),
-              contentScale = ContentScale.Crop
-            )
+            if (remoteUrls.isNotEmpty()) {
+              AsyncImage(
+                model = remoteUrls[selectedPhotoIndex.coerceIn(remoteUrls.indices)],
+                contentDescription = property.titleEn,
+                placeholder = painterResource(id = property.imageResId),
+                error = painterResource(id = property.imageResId),
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+              )
+            } else {
+              Image(
+                painter = painterResource(id = fallbackResList[selectedPhotoIndex.coerceIn(fallbackResList.indices)]),
+                contentDescription = property.titleEn,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+              )
+            }
 
-            // Demonstration Pill
             Surface(
               modifier = Modifier
                 .padding(14.dp)
@@ -1341,7 +1650,7 @@ fun PropertyDetailsView(
               shape = RoundedCornerShape(6.dp)
             ) {
               Text(
-                text = DwelloStrings.demoNotice(currentLanguage),
+                text = DwelloStrings.verifiedListingLabel(currentLanguage),
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.labelSmall.copy(
                   color = Color.White,
@@ -1351,7 +1660,6 @@ fun PropertyDetailsView(
               )
             }
 
-            // Photo Counter Pill
             Surface(
               modifier = Modifier
                 .padding(14.dp)
@@ -1360,7 +1668,7 @@ fun PropertyDetailsView(
               shape = RoundedCornerShape(12.dp)
             ) {
               Text(
-                text = "${selectedPhotoIndex + 1} / ${photos.size} Photos",
+                text = "${selectedPhotoIndex + 1} / $totalPhotos Photos",
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.labelSmall.copy(
                   color = Color.White,
@@ -1370,8 +1678,7 @@ fun PropertyDetailsView(
             }
           }
 
-          // Thumbnail Row
-          if (photos.size > 1) {
+          if (totalPhotos > 1) {
             LazyRow(
               modifier = Modifier
                 .fillMaxWidth()
@@ -1379,7 +1686,7 @@ fun PropertyDetailsView(
                 .padding(vertical = 10.dp, horizontal = 16.dp),
               horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-              items(photos.indices.toList()) { index ->
+              items((0 until totalPhotos).toList()) { index ->
                 val isSelected = selectedPhotoIndex == index
                 Card(
                   modifier = Modifier
@@ -1392,12 +1699,23 @@ fun PropertyDetailsView(
                     ),
                   shape = RoundedCornerShape(8.dp)
                 ) {
-                  Image(
-                    painter = painterResource(id = photos[index]),
-                    contentDescription = "Thumbnail $index",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                  )
+                  if (remoteUrls.isNotEmpty()) {
+                    AsyncImage(
+                      model = remoteUrls[index],
+                      contentDescription = "Thumbnail $index",
+                      placeholder = painterResource(id = property.imageResId),
+                      error = painterResource(id = property.imageResId),
+                      modifier = Modifier.fillMaxSize(),
+                      contentScale = ContentScale.Crop
+                    )
+                  } else {
+                    Image(
+                      painter = painterResource(id = fallbackResList[index]),
+                      contentDescription = "Thumbnail $index",
+                      modifier = Modifier.fillMaxSize(),
+                      contentScale = ContentScale.Crop
+                    )
+                  }
                 }
               }
             }
@@ -1412,7 +1730,6 @@ fun PropertyDetailsView(
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
-          // Property Type & Availability Badges
           Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1461,7 +1778,6 @@ fun PropertyDetailsView(
 
           Spacer(modifier = Modifier.height(12.dp))
 
-          // Title
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH) property.titleEn else property.titlePidgin,
             style = MaterialTheme.typography.titleLarge.copy(
@@ -1473,7 +1789,6 @@ fun PropertyDetailsView(
 
           Spacer(modifier = Modifier.height(6.dp))
 
-          // Location
           Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
               imageVector = Icons.Default.LocationOn,
@@ -1493,7 +1808,6 @@ fun PropertyDetailsView(
 
           Spacer(modifier = Modifier.height(14.dp))
 
-          // Price Tag Card
           Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -1543,12 +1857,10 @@ fun PropertyDetailsView(
 
           Spacer(modifier = Modifier.height(16.dp))
 
-          // Specifications Box
           Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
           ) {
-            // Bedrooms
             Card(
               modifier = Modifier.weight(1f),
               shape = RoundedCornerShape(10.dp),
@@ -1571,7 +1883,6 @@ fun PropertyDetailsView(
               }
             }
 
-            // Bathrooms
             Card(
               modifier = Modifier.weight(1f),
               shape = RoundedCornerShape(10.dp),
@@ -1594,7 +1905,6 @@ fun PropertyDetailsView(
               }
             }
 
-            // Compound Type
             Card(
               modifier = Modifier.weight(1f),
               shape = RoundedCornerShape(10.dp),
@@ -1620,7 +1930,6 @@ fun PropertyDetailsView(
 
           Spacer(modifier = Modifier.height(20.dp))
 
-          // Description Section
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH) "Description" else "Description of House",
             style = MaterialTheme.typography.titleMedium.copy(
@@ -1639,7 +1948,6 @@ fun PropertyDetailsView(
 
           Spacer(modifier = Modifier.height(20.dp))
 
-          // Available Facilities
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH) "Available Facilities" else "Things Wey Dey Inside House",
             style = MaterialTheme.typography.titleMedium.copy(
@@ -1672,7 +1980,6 @@ fun PropertyDetailsView(
 
           Spacer(modifier = Modifier.height(20.dp))
 
-          // Rental Terms
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH) "Rental Terms" else "Rental Conditions",
             style = MaterialTheme.typography.titleMedium.copy(
@@ -1699,7 +2006,6 @@ fun PropertyDetailsView(
 
           Spacer(modifier = Modifier.height(20.dp))
 
-          // Intermediary Notice (Protects landlord privacy)
           Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -1728,9 +2034,9 @@ fun PropertyDetailsView(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                   text = if (currentLanguage == AppLanguage.ENGLISH)
-                    "Dwello Homes connects you directly with the property owner. To ensure your security, an accredited Dwello Homes coordinator will accompany you on your physical inspection."
+                    "Dwello Homes coordinates inspection between you and the property owner while keeping private phone numbers protected."
                   else
-                    "Dwello Homes dey connect you with the house owner. Our coordinator go follow you go check the house in person make everything safe.",
+                    "Dwello Homes dey coordinate house inspection with the house owner and protect private phone numbers.",
                   style = MaterialTheme.typography.bodySmall.copy(
                     color = NavyTextSecondary,
                     lineHeight = 18.sp
@@ -1785,30 +2091,20 @@ fun PropertyDetailsView(
   }
 }
 
-/**
- * Enquiry Form Dialog meeting all specifications:
- * - Tenant Name (validated)
- * - Phone Number (validated)
- * - Property selected (pre-filled)
- * - Preferred inspection date
- * - Additional message
- * - SUBMIT ENQUIRY button
- * - Confirmation screen: "Thank you! Your enquiry has been prepared for Dwello Homes."
- */
 @Composable
 fun EnquiryFormDialog(
   property: PropertyItem,
   currentLanguage: AppLanguage,
-  onDismiss: () -> Unit
+  currentUser: AuthenticatedUser?,
+  isSubmitting: Boolean,
+  submitError: String?,
+  isSubmitted: Boolean,
+  onSubmit: (preferredDate: String, message: String) -> Unit,
+  onDismiss: () -> Unit,
+  onViewEnquiries: () -> Unit
 ) {
-  var tenantName by remember { mutableStateOf("") }
-  var tenantPhone by remember { mutableStateOf("") }
   var preferredDate by remember { mutableStateOf("This Saturday 11:00 AM") }
   var additionalMessage by remember { mutableStateOf("") }
-
-  var nameError by remember { mutableStateOf(false) }
-  var phoneError by remember { mutableStateOf(false) }
-  var isSubmitted by remember { mutableStateOf(false) }
 
   val datePresets = listOf(
     "This Saturday 11:00 AM",
@@ -1819,7 +2115,7 @@ fun EnquiryFormDialog(
 
   if (!isSubmitted) {
     AlertDialog(
-      onDismissRequest = onDismiss,
+      onDismissRequest = { if (!isSubmitting) onDismiss() },
       title = {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Box(
@@ -1852,7 +2148,6 @@ fun EnquiryFormDialog(
           verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
           item {
-            // Selected Property Summary Card
             Card(
               modifier = Modifier.fillMaxWidth(),
               shape = RoundedCornerShape(10.dp),
@@ -1872,7 +2167,7 @@ fun EnquiryFormDialog(
                   )
                 )
                 Text(
-                  text = "📍 ${property.area}, Benin City • ${property.priceFormatted}",
+                  text = "${property.area}, Benin City • ${property.priceFormatted}",
                   style = MaterialTheme.typography.labelSmall.copy(
                     color = SkyBluePrimary,
                     fontWeight = FontWeight.Bold
@@ -1882,66 +2177,31 @@ fun EnquiryFormDialog(
             }
           }
 
-          // 1. Tenant Name (Required)
-          item {
-            OutlinedTextField(
-              value = tenantName,
-              onValueChange = {
-                tenantName = it
-                if (it.isNotBlank()) nameError = false
-              },
-              label = { Text("Your Full Name *") },
-              placeholder = { Text("e.g. Osaro Omoregie") },
-              isError = nameError,
-              supportingText = {
-                if (nameError) {
-                  Text("Please enter your name", color = MaterialTheme.colorScheme.error)
+          if (currentUser != null) {
+            item {
+              Surface(
+                color = SoftBlueAccent,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, SoftBlueBorder),
+                modifier = Modifier.fillMaxWidth()
+              ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                  Text(
+                    text = "Submitted under your verified account:",
+                    style = MaterialTheme.typography.labelSmall.copy(color = NavyTextSecondary)
+                  )
+                  Text(
+                    text = "${currentUser.fullName} (${currentUser.phone})",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                      fontWeight = FontWeight.Bold,
+                      color = DeepNavyText
+                    )
+                  )
                 }
-              },
-              modifier = Modifier
-                .fillMaxWidth()
-                .testTag("enquiry_name_input"),
-              singleLine = true,
-              colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                focusedBorderColor = SkyBluePrimary,
-                unfocusedBorderColor = SoftBlueBorder
-              )
-            )
+              }
+            }
           }
 
-          // 2. Phone Number (Required)
-          item {
-            OutlinedTextField(
-              value = tenantPhone,
-              onValueChange = {
-                tenantPhone = it
-                if (it.length >= 8) phoneError = false
-              },
-              label = { Text("Phone Number *") },
-              placeholder = { Text("e.g. 0803 123 4567") },
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-              isError = phoneError,
-              supportingText = {
-                if (phoneError) {
-                  Text("Please enter a valid phone number", color = MaterialTheme.colorScheme.error)
-                }
-              },
-              modifier = Modifier
-                .fillMaxWidth()
-                .testTag("enquiry_phone_input"),
-              singleLine = true,
-              colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                focusedBorderColor = SkyBluePrimary,
-                unfocusedBorderColor = SoftBlueBorder
-              )
-            )
-          }
-
-          // 3. Preferred Inspection Date
           item {
             Text(
               text = if (currentLanguage == AppLanguage.ENGLISH) "Preferred Inspection Date / Time" else "When you wan check the house?",
@@ -1959,7 +2219,7 @@ fun EnquiryFormDialog(
                   modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable { preferredDate = preset }
+                    .clickable(enabled = !isSubmitting) { preferredDate = preset }
                     .testTag("preset_date_$preset"),
                   color = if (isSelected) SoftBlueAccent else VeryLightBlueBackground,
                   shape = RoundedCornerShape(8.dp),
@@ -1991,7 +2251,25 @@ fun EnquiryFormDialog(
             }
           }
 
-          // 4. Additional Message (Optional)
+          item {
+            OutlinedTextField(
+              value = preferredDate,
+              onValueChange = { preferredDate = it },
+              label = { Text("Preferred Date / Time") },
+              modifier = Modifier
+                .fillMaxWidth()
+                .testTag("enquiry_date_input"),
+              singleLine = true,
+              enabled = !isSubmitting,
+              colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedBorderColor = SkyBluePrimary,
+                unfocusedBorderColor = SoftBlueBorder
+              )
+            )
+          }
+
           item {
             OutlinedTextField(
               value = additionalMessage,
@@ -2002,6 +2280,7 @@ fun EnquiryFormDialog(
                 .fillMaxWidth()
                 .testTag("enquiry_message_input"),
               maxLines = 3,
+              enabled = !isSubmitting,
               colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = Color.White,
                 unfocusedContainerColor = Color.White,
@@ -2010,43 +2289,37 @@ fun EnquiryFormDialog(
               )
             )
           }
+
+          if (!submitError.isNullOrBlank()) {
+            item {
+              Text(
+                text = submitError,
+                style = MaterialTheme.typography.labelSmall.copy(
+                  color = MaterialTheme.colorScheme.error,
+                  fontWeight = FontWeight.Bold
+                ),
+                modifier = Modifier.testTag("enquiry_submit_error")
+              )
+            }
+          }
         }
       },
       confirmButton = {
         Button(
-          onClick = {
-            var valid = true
-            if (tenantName.isBlank()) {
-              nameError = true
-              valid = false
-            }
-            if (tenantPhone.isBlank() || tenantPhone.length < 7) {
-              phoneError = true
-              valid = false
-            }
-
-            if (valid) {
-              // Save to EnquiryRepository for local demonstration and Messages/Enquiries tab integration
-              EnquiryRepository.addEnquiry(
-                EnquiryItem(
-                  id = "enq_${System.currentTimeMillis()}",
-                  propertyId = property.id,
-                  propertyTitle = property.titleEn,
-                  propertyArea = property.area,
-                  propertyPrice = property.priceFormatted,
-                  tenantName = tenantName.trim(),
-                  tenantPhone = tenantPhone.trim(),
-                  preferredInspectionDate = preferredDate,
-                  message = additionalMessage.trim()
-                )
-              )
-              isSubmitted = true
-            }
-          },
+          onClick = { onSubmit(preferredDate.trim(), additionalMessage.trim()) },
+          enabled = !isSubmitting,
           modifier = Modifier.testTag("submit_enquiry_form_btn"),
           colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
           shape = RoundedCornerShape(10.dp)
         ) {
+          if (isSubmitting) {
+            CircularProgressIndicator(
+              color = Color.White,
+              strokeWidth = 2.dp,
+              modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+          }
           Text(
             text = "SUBMIT ENQUIRY",
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
@@ -2054,13 +2327,12 @@ fun EnquiryFormDialog(
         }
       },
       dismissButton = {
-        TextButton(onClick = onDismiss) {
+        TextButton(onClick = onDismiss, enabled = !isSubmitting) {
           Text("Cancel", color = NavyTextSecondary)
         }
       }
     )
   } else {
-    // Confirmation Screen (Exact wording specified in prompt)
     AlertDialog(
       onDismissRequest = onDismiss,
       title = {
@@ -2073,7 +2345,7 @@ fun EnquiryFormDialog(
           )
           Spacer(modifier = Modifier.width(10.dp))
           Text(
-            text = "Enquiry Prepared",
+            text = "Enquiry Submitted",
             style = MaterialTheme.typography.titleMedium.copy(
               fontWeight = FontWeight.Bold,
               color = DeepNavyText
@@ -2084,7 +2356,7 @@ fun EnquiryFormDialog(
       text = {
         Column(modifier = Modifier.fillMaxWidth()) {
           Text(
-            text = "Thank you! Your enquiry has been prepared for Dwello Homes.",
+            text = "Thank you! Your enquiry has been sent to Dwello Homes.",
             style = MaterialTheme.typography.bodyLarge.copy(
               fontWeight = FontWeight.Bold,
               color = DeepNavyText
@@ -2095,9 +2367,9 @@ fun EnquiryFormDialog(
 
           Text(
             text = if (currentLanguage == AppLanguage.ENGLISH)
-              "Dwello Homes will review your requested inspection for ${property.titleEn} in ${property.area}. Our coordinator will contact you at $tenantPhone to confirm the landlord's availability."
+              "Dwello Homes has recorded your inspection request for ${property.titleEn} in ${property.area}. You can track status updates in the Enquiries tab."
             else
-              "Dwello Homes go check your inspection request for ${property.titleEn} for ${property.area}. We go call you on $tenantPhone to confirm the time with the house owner.",
+              "Dwello Homes don save your inspection request for ${property.titleEn} for ${property.area}. You fit track update inside Enquiries tab.",
             style = MaterialTheme.typography.bodyMedium.copy(
               color = NavyTextSecondary,
               lineHeight = 20.sp
@@ -2113,14 +2385,14 @@ fun EnquiryFormDialog(
           ) {
             Column(modifier = Modifier.padding(10.dp)) {
               Text(
-                text = "📌 Preferred Inspection: $preferredDate",
+                text = "Preferred Inspection: $preferredDate",
                 style = MaterialTheme.typography.labelMedium.copy(
                   fontWeight = FontWeight.Bold,
                   color = DeepNavyText
                 )
               )
               Text(
-                text = "Your enquiry is saved in the Enquiries tab.",
+                text = "Status updates appear in your Enquiries tab.",
                 style = MaterialTheme.typography.labelSmall.copy(color = SkyBlueDark)
               )
             }
@@ -2129,11 +2401,17 @@ fun EnquiryFormDialog(
       },
       confirmButton = {
         Button(
-          onClick = onDismiss,
+          onClick = onViewEnquiries,
           colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
-          shape = RoundedCornerShape(10.dp)
+          shape = RoundedCornerShape(10.dp),
+          modifier = Modifier.testTag("enquiry_done_view_tab_btn")
         ) {
-          Text("Done", fontWeight = FontWeight.Bold)
+          Text("View Enquiries", fontWeight = FontWeight.Bold)
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = onDismiss) {
+          Text("Done", color = NavyTextSecondary, fontWeight = FontWeight.Bold)
         }
       }
     )

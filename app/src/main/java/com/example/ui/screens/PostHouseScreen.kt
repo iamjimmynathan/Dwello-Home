@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -50,9 +49,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,7 +60,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -75,25 +73,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.R
 import com.example.data.AppLanguage
+import com.example.data.AuthenticatedUser
 import com.example.data.DwelloStrings
-import com.example.data.PropertyApprovalStatus
-import com.example.data.PropertyItem
 import com.example.data.RentalPeriod
 import com.example.data.SamplePropertyData
 import com.example.ui.components.DwelloHeader
-import com.example.ui.theme.CardBorderSubtle
 import com.example.ui.theme.DeepNavyText
 import com.example.ui.theme.MainBackgroundWhite
 import com.example.ui.theme.NavyTextSecondary
-import com.example.ui.theme.SkyBlueDark
 import com.example.ui.theme.SkyBluePrimary
 import com.example.ui.theme.SoftBlueAccent
 import com.example.ui.theme.SoftBlueBorder
@@ -103,7 +96,24 @@ import com.example.ui.theme.VeryLightBlueBackground
 @Composable
 fun PostHouseScreen(
   currentLanguage: AppLanguage,
+  currentUser: AuthenticatedUser?,
+  isSubmitting: Boolean,
+  submitError: String?,
+  submittedPropertyId: String?,
   onLanguageToggle: () -> Unit,
+  onSubmitProperty: (
+    title: String,
+    propertyTypeDisplay: String,
+    bedrooms: Int,
+    bathrooms: Int,
+    rentAmount: Long,
+    rentalPeriod: RentalPeriod,
+    description: String,
+    neighbourhood: String,
+    fullAddress: String,
+    landmark: String?
+  ) -> Unit,
+  onResetSubmitState: () -> Unit,
   onSuccessNavigateHome: () -> Unit,
   onBack: (() -> Unit)? = null,
   modifier: Modifier = Modifier
@@ -123,7 +133,7 @@ fun PostHouseScreen(
   var selectedNeighbourhood by remember { mutableStateOf("") }
   var addressOrLandmark by remember { mutableStateOf("") }
 
-  // Facilities State
+  // Facilities State (appended clearly to description when sent to API)
   val selectedFacilities = remember {
     mutableStateListOf(
       "Water supply",
@@ -133,7 +143,7 @@ fun PostHouseScreen(
   }
   var additionalFacilitiesText by remember { mutableStateOf("") }
 
-  // Photos State (Multiple photo URIs from Android Photo Picker)
+  // Photos State (local preview URIs via Android Photo Picker)
   val selectedPhotoUris = remember { mutableStateListOf<String>() }
 
   // Validation Error States
@@ -145,12 +155,9 @@ fun PostHouseScreen(
   var descriptionError by remember { mutableStateOf<String?>(null) }
   var photosError by remember { mutableStateOf<String?>(null) }
 
-  // Dialog States
+  // Discard Dialog State
   var showDiscardDialog by remember { mutableStateOf(false) }
-  var showSuccessDialog by remember { mutableStateOf(false) }
-  var generatedRefNumber by remember { mutableStateOf("") }
 
-  // Determine if form has dirty uncommitted data
   val isFormDirty = remember(
     propertyTitle,
     rentAmountString,
@@ -167,16 +174,15 @@ fun PostHouseScreen(
       selectedPhotoUris.isNotEmpty()
   }
 
-  // Intercept back navigation
-  BackHandler {
+  BackHandler(enabled = !isSubmitting && submittedPropertyId == null) {
     if (isFormDirty) {
       showDiscardDialog = true
     } else {
+      onResetSubmitState()
       handleBack()
     }
   }
 
-  // Android Photo Picker Launcher (Zero-permission Android 13+ standard Photo Picker)
   val photoPickerLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
   ) { uris: List<Uri> ->
@@ -196,7 +202,6 @@ fun PostHouseScreen(
       .fillMaxSize()
       .background(MainBackgroundWhite)
   ) {
-    // 1. Header with Language Switch
     DwelloHeader(
       currentLanguage = currentLanguage,
       onLanguageToggle = onLanguageToggle
@@ -208,7 +213,7 @@ fun PostHouseScreen(
         .testTag("post_house_form_scroll"),
       contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp)
     ) {
-      // 2. Navigation Top Bar with Back Button
+      // Navigation Top Bar with Back Button
       item {
         Row(
           modifier = Modifier.fillMaxWidth(),
@@ -216,10 +221,13 @@ fun PostHouseScreen(
         ) {
           IconButton(
             onClick = {
-              if (isFormDirty) {
-                showDiscardDialog = true
-              } else {
-                handleBack()
+              if (!isSubmitting) {
+                if (isFormDirty) {
+                  showDiscardDialog = true
+                } else {
+                  onResetSubmitState()
+                  handleBack()
+                }
               }
             },
             modifier = Modifier.testTag("post_house_back_button")
@@ -242,7 +250,7 @@ fun PostHouseScreen(
               )
             )
             Text(
-              text = "Dwello Homes • Benin City, Edo State",
+              text = "${currentUser?.fullName ?: "Landlord"} • Benin City, Edo State",
               style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
             )
           }
@@ -250,7 +258,6 @@ fun PostHouseScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Instructional Banner for High Accessibility
         Card(
           modifier = Modifier.fillMaxWidth(),
           shape = RoundedCornerShape(14.dp),
@@ -276,25 +283,21 @@ fun PostHouseScreen(
               )
             }
             Spacer(modifier = Modifier.width(12.dp))
-            Column {
-              Text(
-                text = DwelloStrings.postHouseInstruction(currentLanguage),
-                style = MaterialTheme.typography.bodySmall.copy(
-                  color = DeepNavyText,
-                  fontWeight = FontWeight.Medium,
-                  lineHeight = 18.sp
-                )
+            Text(
+              text = DwelloStrings.postHouseInstruction(currentLanguage),
+              style = MaterialTheme.typography.bodySmall.copy(
+                color = DeepNavyText,
+                fontWeight = FontWeight.Medium,
+                lineHeight = 18.sp
               )
-            }
+            )
           }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
       }
 
-      // ==========================================
       // SECTION 1: PROPERTY PHOTOS
-      // ==========================================
       item {
         Text(
           text = DwelloStrings.sectionPhotosTitle(currentLanguage),
@@ -313,13 +316,13 @@ fun PostHouseScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Big Select Photos Button
         Button(
           onClick = {
             photoPickerLauncher.launch(
               PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
             )
           },
+          enabled = !isSubmitting,
           modifier = Modifier
             .fillMaxWidth()
             .height(54.dp)
@@ -349,7 +352,6 @@ fun PostHouseScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Selected Photos Horizontal Carousel Preview
         if (selectedPhotoUris.isNotEmpty()) {
           Text(
             text = DwelloStrings.selectedPhotosCount(currentLanguage, selectedPhotoUris.size),
@@ -378,14 +380,13 @@ fun PostHouseScreen(
                   contentScale = ContentScale.Crop
                 )
 
-                // Remove Photo Button
                 Surface(
                   modifier = Modifier
                     .padding(6.dp)
                     .size(26.dp)
                     .align(Alignment.TopEnd)
                     .clip(CircleShape)
-                    .clickable { selectedPhotoUris.remove(uriString) }
+                    .clickable(enabled = !isSubmitting) { selectedPhotoUris.remove(uriString) }
                     .testTag("remove_photo_btn"),
                   color = Color.Black.copy(alpha = 0.75f)
                 ) {
@@ -402,7 +403,6 @@ fun PostHouseScreen(
             }
           }
         } else {
-          // No photos message
           Surface(
             color = Color(0xFFF8FAFC),
             shape = RoundedCornerShape(10.dp),
@@ -414,21 +414,23 @@ fun PostHouseScreen(
               verticalAlignment = Alignment.CenterVertically
             ) {
               Icon(
-                imageVector = Icons.Default.Warning,
+                imageVector = Icons.Default.Info,
                 contentDescription = null,
                 tint = NavyTextSecondary,
                 modifier = Modifier.size(18.dp)
               )
               Spacer(modifier = Modifier.width(8.dp))
               Text(
-                text = DwelloStrings.noPhotosSelected(currentLanguage),
+                text = if (currentLanguage == AppLanguage.ENGLISH)
+                  "Optional on this form: you can preview gallery photos on-device while listing details are sent to Dwello Homes."
+                else
+                  "You fit pick pictures preview for phone while house details go send to Dwello Homes server.",
                 style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
               )
             }
           }
         }
 
-        // Inline Photo Error
         photosError?.let { err ->
           Spacer(modifier = Modifier.height(6.dp))
           Text(
@@ -453,9 +455,7 @@ fun PostHouseScreen(
         Spacer(modifier = Modifier.height(24.dp))
       }
 
-      // ==========================================
       // SECTION 2: PROPERTY DETAILS
-      // ==========================================
       item {
         Text(
           text = DwelloStrings.sectionDetailsTitle(currentLanguage),
@@ -466,7 +466,6 @@ fun PostHouseScreen(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Property Title
         Text(
           text = DwelloStrings.titleLabel(currentLanguage),
           style = MaterialTheme.typography.labelMedium.copy(
@@ -483,6 +482,7 @@ fun PostHouseScreen(
           },
           placeholder = { Text(DwelloStrings.titlePlaceholder(currentLanguage)) },
           isError = titleError != null,
+          enabled = !isSubmitting,
           modifier = Modifier
             .fillMaxWidth()
             .testTag("property_title_input"),
@@ -512,7 +512,6 @@ fun PostHouseScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Property Type Chips
         Text(
           text = DwelloStrings.selectTypeLabel(currentLanguage),
           style = MaterialTheme.typography.labelMedium.copy(
@@ -531,6 +530,7 @@ fun PostHouseScreen(
             val isSelected = selectedPropertyType == pType
             FilterChip(
               selected = isSelected,
+              enabled = !isSubmitting,
               onClick = {
                 selectedPropertyType = pType
                 typeError = null
@@ -574,12 +574,10 @@ fun PostHouseScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Steppers for Bedrooms and Bathrooms
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-          // Bedrooms
           Column(modifier = Modifier.weight(1f)) {
             Text(
               text = DwelloStrings.bedroomsCountLabel(currentLanguage),
@@ -605,6 +603,7 @@ fun PostHouseScreen(
                     bedroomsError = null
                   }
                 },
+                enabled = !isSubmitting,
                 modifier = Modifier.size(36.dp)
               ) {
                 Icon(Icons.Default.Remove, contentDescription = "Decrease Bedrooms", tint = SkyBluePrimary)
@@ -621,6 +620,7 @@ fun PostHouseScreen(
                   bedroomsCount++
                   bedroomsError = null
                 },
+                enabled = !isSubmitting,
                 modifier = Modifier.size(36.dp)
               ) {
                 Icon(Icons.Default.Add, contentDescription = "Increase Bedrooms", tint = SkyBluePrimary)
@@ -628,7 +628,6 @@ fun PostHouseScreen(
             }
           }
 
-          // Bathrooms
           Column(modifier = Modifier.weight(1f)) {
             Text(
               text = DwelloStrings.bathroomsCountLabel(currentLanguage),
@@ -649,6 +648,7 @@ fun PostHouseScreen(
             ) {
               IconButton(
                 onClick = { if (bathroomsCount > 1) bathroomsCount-- },
+                enabled = !isSubmitting,
                 modifier = Modifier.size(36.dp)
               ) {
                 Icon(Icons.Default.Remove, contentDescription = "Decrease Bathrooms", tint = SkyBluePrimary)
@@ -662,6 +662,7 @@ fun PostHouseScreen(
               )
               IconButton(
                 onClick = { bathroomsCount++ },
+                enabled = !isSubmitting,
                 modifier = Modifier.size(36.dp)
               ) {
                 Icon(Icons.Default.Add, contentDescription = "Increase Bathrooms", tint = SkyBluePrimary)
@@ -683,7 +684,6 @@ fun PostHouseScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Rent Amount and Payment Period
         Text(
           text = DwelloStrings.rentAmountLabel(currentLanguage),
           style = MaterialTheme.typography.labelMedium.copy(
@@ -701,6 +701,7 @@ fun PostHouseScreen(
           },
           placeholder = { Text(DwelloStrings.rentAmountPlaceholder(currentLanguage)) },
           isError = rentError != null,
+          enabled = !isSubmitting,
           prefix = {
             Text("₦ ", fontWeight = FontWeight.ExtraBold, color = SkyBluePrimary)
           },
@@ -734,7 +735,6 @@ fun PostHouseScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Preferred Payment Period Segmented Options
         Text(
           text = DwelloStrings.paymentPeriodLabel(currentLanguage),
           style = MaterialTheme.typography.labelMedium.copy(
@@ -747,13 +747,12 @@ fun PostHouseScreen(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-          // Yearly
           val isYearly = rentalPeriod == RentalPeriod.YEARLY
           Surface(
             modifier = Modifier
               .weight(1f)
               .clip(RoundedCornerShape(10.dp))
-              .clickable { rentalPeriod = RentalPeriod.YEARLY }
+              .clickable(enabled = !isSubmitting) { rentalPeriod = RentalPeriod.YEARLY }
               .testTag("period_yearly_btn"),
             color = if (isYearly) SkyBluePrimary else Color.White,
             shape = RoundedCornerShape(10.dp),
@@ -778,13 +777,12 @@ fun PostHouseScreen(
             }
           }
 
-          // Monthly
           val isMonthly = rentalPeriod == RentalPeriod.MONTHLY
           Surface(
             modifier = Modifier
               .weight(1f)
               .clip(RoundedCornerShape(10.dp))
-              .clickable { rentalPeriod = RentalPeriod.MONTHLY }
+              .clickable(enabled = !isSubmitting) { rentalPeriod = RentalPeriod.MONTHLY }
               .testTag("period_monthly_btn"),
             color = if (isMonthly) SkyBluePrimary else Color.White,
             shape = RoundedCornerShape(10.dp),
@@ -812,7 +810,6 @@ fun PostHouseScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Property Description
         Text(
           text = DwelloStrings.descriptionLabel(currentLanguage),
           style = MaterialTheme.typography.labelMedium.copy(
@@ -829,6 +826,7 @@ fun PostHouseScreen(
           },
           placeholder = { Text(DwelloStrings.descriptionPlaceholder(currentLanguage)) },
           isError = descriptionError != null,
+          enabled = !isSubmitting,
           modifier = Modifier
             .fillMaxWidth()
             .height(120.dp)
@@ -860,9 +858,7 @@ fun PostHouseScreen(
         Spacer(modifier = Modifier.height(24.dp))
       }
 
-      // ==========================================
       // SECTION 3: PROPERTY LOCATION (BENIN CITY)
-      // ==========================================
       item {
         Text(
           text = DwelloStrings.sectionLocationTitle(currentLanguage),
@@ -882,7 +878,6 @@ fun PostHouseScreen(
         )
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Benin City Neighbourhood Chips
         FlowRow(
           horizontalArrangement = Arrangement.spacedBy(8.dp),
           verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -893,7 +888,7 @@ fun PostHouseScreen(
             Surface(
               modifier = Modifier
                 .clip(RoundedCornerShape(10.dp))
-                .clickable {
+                .clickable(enabled = !isSubmitting) {
                   selectedNeighbourhood = areaItem.name
                   neighbourhoodError = null
                 }
@@ -939,7 +934,6 @@ fun PostHouseScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Full Address or Landmark
         Text(
           text = DwelloStrings.addressLabel(currentLanguage),
           style = MaterialTheme.typography.labelMedium.copy(
@@ -952,6 +946,7 @@ fun PostHouseScreen(
           value = addressOrLandmark,
           onValueChange = { addressOrLandmark = it },
           placeholder = { Text(DwelloStrings.addressPlaceholder(currentLanguage)) },
+          enabled = !isSubmitting,
           modifier = Modifier
             .fillMaxWidth()
             .testTag("address_or_landmark_input"),
@@ -979,9 +974,7 @@ fun PostHouseScreen(
         Spacer(modifier = Modifier.height(24.dp))
       }
 
-      // ==========================================
       // SECTION 4: PROPERTY FACILITIES
-      // ==========================================
       item {
         Text(
           text = DwelloStrings.sectionFacilitiesTitle(currentLanguage),
@@ -996,7 +989,6 @@ fun PostHouseScreen(
         )
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Facilities Checkbox List in very light blue background
         Column(
           modifier = Modifier
             .fillMaxWidth()
@@ -1015,7 +1007,7 @@ fun PostHouseScreen(
                   modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable {
+                    .clickable(enabled = !isSubmitting) {
                       if (isChecked) {
                         selectedFacilities.remove(facility)
                       } else {
@@ -1027,6 +1019,7 @@ fun PostHouseScreen(
                 ) {
                   Checkbox(
                     checked = isChecked,
+                    enabled = !isSubmitting,
                     onCheckedChange = { checked ->
                       if (checked) selectedFacilities.add(facility) else selectedFacilities.remove(facility)
                     },
@@ -1052,7 +1045,6 @@ fun PostHouseScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Additional Facilities Description
         Text(
           text = DwelloStrings.additionalFacilitiesLabel(currentLanguage),
           style = MaterialTheme.typography.labelMedium.copy(
@@ -1065,6 +1057,7 @@ fun PostHouseScreen(
           value = additionalFacilitiesText,
           onValueChange = { additionalFacilitiesText = it },
           placeholder = { Text(DwelloStrings.additionalFacilitiesPlaceholder(currentLanguage)) },
+          enabled = !isSubmitting,
           modifier = Modifier
             .fillMaxWidth()
             .height(90.dp)
@@ -1084,9 +1077,7 @@ fun PostHouseScreen(
         Spacer(modifier = Modifier.height(20.dp))
       }
 
-      // ==========================================
       // SECTION 5: PRIVACY & SUBMIT BUTTON
-      // ==========================================
       item {
         Card(
           modifier = Modifier.fillMaxWidth(),
@@ -1117,12 +1108,31 @@ fun PostHouseScreen(
           }
         }
 
+        if (!submitError.isNullOrBlank()) {
+          Spacer(modifier = Modifier.height(12.dp))
+          Surface(
+            color = Color(0xFFFEF2F2),
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, Color(0xFFFECACA)),
+            modifier = Modifier
+              .fillMaxWidth()
+              .testTag("post_house_server_error")
+          ) {
+            Text(
+              text = submitError,
+              modifier = Modifier.padding(12.dp),
+              style = MaterialTheme.typography.bodySmall.copy(
+                color = Color(0xFF991B1B),
+                fontWeight = FontWeight.SemiBold
+              )
+            )
+          }
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Large Primary Submit Button
         Button(
           onClick = {
-            // Validate all fields
             var hasErrors = false
 
             if (propertyTitle.trim().isEmpty()) {
@@ -1161,60 +1171,41 @@ fun PostHouseScreen(
               descriptionError = null
             }
 
-            if (selectedPhotoUris.isEmpty()) {
-              photosError = DwelloStrings.noPhotosSelected(currentLanguage)
-              hasErrors = true
-            } else {
-              photosError = null
-            }
-
             if (!hasErrors) {
-              // Create property and set status automatically to PENDING_APPROVAL
-              val newPropId = "prop_landlord_${System.currentTimeMillis()}"
-              val formattedPrice = "₦${String.format("%,d", rentVal)}"
-              val paymentPeriodSuffix = if (rentalPeriod == RentalPeriod.YEARLY) " / year" else " / month"
+              val facilitiesSummary = buildList {
+                if (selectedFacilities.isNotEmpty()) {
+                  add("Facilities: ${selectedFacilities.joinToString(", ")}")
+                }
+                if (additionalFacilitiesText.isNotBlank()) {
+                  add(additionalFacilitiesText.trim())
+                }
+              }.joinToString(". ")
 
-              val newProperty = PropertyItem(
-                id = newPropId,
-                titleEn = propertyTitle.trim(),
-                titlePidgin = propertyTitle.trim(),
-                categoryEn = selectedPropertyType,
-                categoryPidgin = selectedPropertyType,
-                area = selectedNeighbourhood,
-                priceNaira = rentVal,
-                priceFormatted = formattedPrice,
-                rentalPeriod = rentalPeriod,
-                bedrooms = bedroomsCount,
-                bathrooms = bathroomsCount,
-                isGated = selectedFacilities.contains("Fenced compound") || selectedFacilities.contains("Security"),
-                hasBorehole = selectedFacilities.contains("Water supply") || selectedFacilities.contains("Running water"),
-                hasPrepaidMeter = selectedFacilities.contains("Electricity"),
-                landlordName = SamplePropertyData.CURRENT_LANDLORD_NAME,
-                landlordRoleEn = "Landlord (Property Owner)",
-                landlordRolePidgin = "Direct House Owner",
-                phoneContact = "0800 393 556", // Never expose private landlord phone number to tenants
-                descriptionEn = propertyDescription.trim(),
-                descriptionPidgin = propertyDescription.trim(),
-                neighborhoodNote = addressOrLandmark.ifBlank { "Benin City Residential Axis" },
-                photoUris = selectedPhotoUris.toList(),
-                imageResId = R.drawable.img_benin_house_exterior,
-                facilities = selectedFacilities.toList(),
-                additionalFacilitiesNote = additionalFacilitiesText.trim(),
-                rentalTerms = "${if (rentalPeriod == RentalPeriod.YEARLY) "1 Year" else "Monthly"} rent advance. Inspection strictly coordinated via Dwello Homes.",
-                availabilityStatus = "Under Review by Dwello Homes",
-                approvalStatus = PropertyApprovalStatus.PENDING_APPROVAL,
-                rejectionReason = null,
-                submissionTimestamp = System.currentTimeMillis(),
-                isDemonstrationData = false
+              val fullDescription = if (facilitiesSummary.isNotBlank()) {
+                "${propertyDescription.trim()}\n\n$facilitiesSummary"
+              } else {
+                propertyDescription.trim()
+              }
+
+              val resolvedAddress = addressOrLandmark.trim()
+                .ifBlank { "$selectedNeighbourhood Axis, Benin City" }
+              val resolvedLandmark = addressOrLandmark.trim().takeIf { it.isNotBlank() }
+
+              onSubmitProperty(
+                propertyTitle.trim(),
+                selectedPropertyType,
+                bedroomsCount,
+                bathroomsCount,
+                rentVal,
+                rentalPeriod,
+                fullDescription,
+                selectedNeighbourhood,
+                resolvedAddress,
+                resolvedLandmark
               )
-
-              // Add to repository
-              SamplePropertyData.addProperty(newProperty)
-
-              generatedRefNumber = "DWL-BEN-${(1000..9999).random()}"
-              showSuccessDialog = true
             }
           },
+          enabled = !isSubmitting,
           modifier = Modifier
             .fillMaxWidth()
             .height(58.dp)
@@ -1230,12 +1221,20 @@ fun PostHouseScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
           ) {
-            Icon(
-              imageVector = Icons.Default.CheckCircle,
-              contentDescription = null,
-              tint = Color.White,
-              modifier = Modifier.size(22.dp)
-            )
+            if (isSubmitting) {
+              CircularProgressIndicator(
+                color = Color.White,
+                strokeWidth = 2.5.dp,
+                modifier = Modifier.size(22.dp)
+              )
+            } else {
+              Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(22.dp)
+              )
+            }
             Spacer(modifier = Modifier.width(10.dp))
             Text(
               text = DwelloStrings.submitButtonText(currentLanguage),
@@ -1253,9 +1252,7 @@ fun PostHouseScreen(
     }
   }
 
-  // ==========================================
   // DISCARD CONFIRMATION DIALOG
-  // ==========================================
   if (showDiscardDialog) {
     AlertDialog(
       onDismissRequest = { showDiscardDialog = false },
@@ -1279,6 +1276,7 @@ fun PostHouseScreen(
         Button(
           onClick = {
             showDiscardDialog = false
+            onResetSubmitState()
             handleBack()
           },
           colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
@@ -1299,14 +1297,12 @@ fun PostHouseScreen(
     )
   }
 
-  // ==========================================
-  // SUBMISSION SUCCESS CONFIRMATION DIALOG
-  // ==========================================
-  if (showSuccessDialog) {
+  // SUBMISSION SUCCESS CONFIRMATION DIALOG (POST /api/properties)
+  if (!submittedPropertyId.isNullOrBlank()) {
     AlertDialog(
       onDismissRequest = {
-        showSuccessDialog = false
-        handleBack()
+        onResetSubmitState()
+        onSuccessNavigateHome()
       },
       icon = {
         Icon(
@@ -1337,7 +1333,6 @@ fun PostHouseScreen(
 
           Spacer(modifier = Modifier.height(12.dp))
 
-          // Pending Approval Badge
           Surface(
             color = Color(0xFFFEF3C7),
             shape = RoundedCornerShape(10.dp),
@@ -1383,7 +1378,7 @@ fun PostHouseScreen(
             modifier = Modifier.fillMaxWidth()
           ) {
             Text(
-              text = "Listing Ref: $generatedRefNumber",
+              text = "Listing ID: $submittedPropertyId",
               modifier = Modifier.padding(8.dp),
               style = MaterialTheme.typography.labelMedium.copy(
                 fontWeight = FontWeight.Bold,
@@ -1396,8 +1391,8 @@ fun PostHouseScreen(
       confirmButton = {
         Button(
           onClick = {
-            showSuccessDialog = false
-            handleBack()
+            onResetSubmitState()
+            onSuccessNavigateHome()
           },
           colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
           modifier = Modifier
