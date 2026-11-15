@@ -41,22 +41,33 @@ sealed class DwelloApiResult<out T> {
 object PropertyTypeSlugMapper {
   private val displayToSlug = linkedMapOf(
     "Self-contained" to "self_contained",
-    "Mini flat" to "mini_flat",
+    "Mini Flat" to "mini_flat",
+    "1 Bedroom" to "1_bedroom",
+    "2 Bedroom" to "2_bedroom",
+    "3 Bedroom" to "3_bedroom",
+    "Duplex" to "duplex",
+    "Detached House" to "detached_house",
+    "Shared Accommodation" to "shared_room"
+  )
+
+  private val aliasToSlug = mapOf(
+    "mini flat" to "mini_flat",
     "1-bedroom apartment" to "1_bedroom",
     "2-bedroom apartment" to "2_bedroom",
     "3-bedroom apartment" to "3_bedroom",
-    "Duplex" to "duplex",
-    "Detached house" to "detached_house",
-    "Shared accommodation" to "shared_room"
+    "detached house" to "detached_house",
+    "shared accommodation" to "shared_room"
   )
 
   private val slugToDisplay = displayToSlug.entries.associate { (display, slug) -> slug to display }
 
   fun toApiSlug(displayLabel: String): String {
-    displayToSlug.entries.firstOrNull { it.key.equals(displayLabel.trim(), ignoreCase = true) }?.let {
+    val clean = displayLabel.trim()
+    displayToSlug.entries.firstOrNull { it.key.equals(clean, ignoreCase = true) }?.let {
       return it.value
     }
-    return displayLabel.trim().lowercase(Locale.ROOT).replace(" ", "_").replace("-", "_")
+    aliasToSlug[clean.lowercase(Locale.ROOT)]?.let { return it }
+    return clean.lowercase(Locale.ROOT).replace(" ", "_").replace("-", "_")
   }
 
   fun toDisplayLabel(slug: String): String {
@@ -102,9 +113,9 @@ object DwelloMappers {
       RentalPeriod.YEARLY
     }
 
-    val isUnavailable = availability_status.equals("unavailable", ignoreCase = true)
+    val isAvailableFlag = availability_status.isNullOrBlank() || availability_status.equals("available", ignoreCase = true)
     val status = when {
-      isUnavailable -> PropertyApprovalStatus.UNAVAILABLE
+      !isAvailableFlag -> PropertyApprovalStatus.UNAVAILABLE
       moderation_status.equals("approved", ignoreCase = true) -> PropertyApprovalStatus.APPROVED
       moderation_status.equals("rejected", ignoreCase = true) -> PropertyApprovalStatus.REJECTED
       else -> PropertyApprovalStatus.PENDING_APPROVAL
@@ -116,6 +127,10 @@ object DwelloMappers {
       PropertyApprovalStatus.REJECTED -> "Listing Not Approved"
       PropertyApprovalStatus.PENDING_APPROVAL -> "Under Review by Dwello Homes"
     }
+
+    val formattedDate = created_at?.trim()?.takeIf { it.isNotEmpty() }?.let { raw ->
+      raw.substringBefore("T").ifBlank { raw }
+    } ?: "Submitted"
 
     val note = listOfNotNull(
       landmark?.trim()?.takeIf { it.isNotEmpty() },
@@ -149,7 +164,7 @@ object DwelloMappers {
       bathrooms = bathrooms.coerceAtLeast(1),
       isGated = description.contains("gate", ignoreCase = true) || description.contains("fenc", ignoreCase = true),
       hasBorehole = description.contains("water", ignoreCase = true) || description.contains("borehole", ignoreCase = true),
-      hasPrepaidMeter = description.contains("prepaid", ignoreCase = true) || description.contains("meter", ignoreCase = true),
+      hasPrepaidMeter = description.contains("prepaid", ignoreCase = true) || description.contains("meter", ignoreCase = true) || description.contains("electricity", ignoreCase = true),
       landlordName = landlord_name?.trim()?.takeIf { it.isNotEmpty() } ?: "Verified Property Owner",
       landlordRoleEn = "Property Owner",
       landlordRolePidgin = "House Owner",
@@ -163,26 +178,22 @@ object DwelloMappers {
       imageResList = listOf(fallbackRes),
       photoUris = imageUrls,
       facilities = buildList {
-        if (description.contains("water", ignoreCase = true) || description.contains("borehole", ignoreCase = true)) {
-          add("Borehole / Running Water")
-        }
-        if (description.contains("prepaid", ignoreCase = true) || description.contains("meter", ignoreCase = true)) {
-          add("Prepaid Meter")
-        }
-        if (description.contains("gate", ignoreCase = true) || description.contains("security", ignoreCase = true)) {
-          add("Fenced & Gated Compound")
-        }
-        if (description.contains("park", ignoreCase = true)) {
-          add("Parking Space")
-        }
-        if (isEmpty()) {
-          add("Verified Benin City Listing")
-        }
+        if (description.contains("water", ignoreCase = true)) add("Water")
+        if (description.contains("borehole", ignoreCase = true)) add("Borehole")
+        if (description.contains("electricity", ignoreCase = true) || description.contains("prepaid", ignoreCase = true)) add("Electricity")
+        if (description.contains("parking", ignoreCase = true)) add("Parking")
+        if (description.contains("security", ignoreCase = true) || description.contains("gate", ignoreCase = true)) add("Security")
+        if (description.contains("kitchen", ignoreCase = true)) add("Kitchen")
+        if (description.contains("tiled", ignoreCase = true)) add("Tiled Floor")
+        if (description.contains("wardrobe", ignoreCase = true)) add("Wardrobe")
+        if (isEmpty()) add("Verified Benin City Listing")
       },
       rentalTerms = "$periodText rent term. Physical inspection coordinated through Dwello Homes.",
       availabilityStatus = availabilityLabel,
+      isAvailable = isAvailableFlag,
       approvalStatus = status,
       rejectionReason = rejection_reason?.takeIf { it.isNotBlank() },
+      createdAtDisplay = formattedDate,
       isDemonstrationData = false
     )
   }
@@ -237,13 +248,15 @@ open class DwelloRepository(
         val mapped = dto?.let { with(DwelloMappers) { it.toAuthenticatedUserOrNull() } }
         if (mapped == null) {
           tokenStore.clearSession()
+          val roleDesc = dto?.role?.trim()?.takeIf { it.isNotEmpty() } ?: "missing"
           DwelloApiResult.Error(
             message = if (dto != null) {
-              "Account role '${dto.role}' is not supported in this mobile client."
+              "Account verification required: account role '$roleDesc' is not valid. Please sign in with a verified Tenant or Landlord account."
             } else {
-              "Unable to verify session user."
+              "Unable to verify your Dwello account details. Please log in again."
             },
-            isUnauthorized = true
+            httpCode = 403,
+            isUnauthorized = false
           )
         } else {
           DwelloApiResult.Success(mapped, body.message)
@@ -329,8 +342,10 @@ open class DwelloRepository(
         val userDto = body.user
         val mappedUser = userDto?.let { with(DwelloMappers) { it.toAuthenticatedUserOrNull() } }
         if (token.isNullOrBlank() || mappedUser == null) {
+          tokenStore.clearSession()
           val msg = if (userDto != null && mappedUser == null) {
-            "Account role '${userDto.role}' is not supported in this mobile client."
+            val roleDesc = userDto.role.trim().ifEmpty { "missing" }
+            "Account verification required: account role '$roleDesc' is not valid. Please use a verified Tenant or Landlord account."
           } else {
             body.message ?: "Login succeeded without valid session credentials."
           }
@@ -363,7 +378,7 @@ open class DwelloRepository(
       onSuccess = { body ->
         val mapped = body.properties
           .map { with(DwelloMappers) { it.toPropertyItem() } }
-          .filter { it.approvalStatus == PropertyApprovalStatus.APPROVED }
+          .filter { it.approvalStatus == PropertyApprovalStatus.APPROVED && it.isAvailable }
         DwelloApiResult.Success(mapped, body.message)
       }
     )

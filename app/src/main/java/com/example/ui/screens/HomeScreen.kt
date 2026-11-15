@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddHome
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -77,6 +76,7 @@ import coil.compose.AsyncImage
 import com.example.data.AppLanguage
 import com.example.data.AuthenticatedUser
 import com.example.data.DwelloStrings
+import com.example.data.PropertyApprovalStatus
 import com.example.data.PropertyItem
 import com.example.data.RentalPeriod
 import com.example.data.SamplePropertyData
@@ -107,7 +107,6 @@ fun HomeScreen(
   enquirySubmittedSuccess: Boolean,
   onLanguageToggle: () -> Unit,
   onNavigateToFindHouses: (searchQuery: String?) -> Unit,
-  onNavigateToPostHouse: () -> Unit,
   onRetryLoadProperties: () -> Unit,
   onToggleFavourite: (String) -> Unit,
   onOpenPropertyDetails: (PropertyItem) -> Unit,
@@ -280,7 +279,7 @@ fun HomeScreen(
         }
       }
 
-      // 4. TWO LARGE MAIN BUTTONS: FIND A HOUSE (Sky Blue) and POST A HOUSE (White with Sky Blue border)
+      // 4. PROMINENT TENANT ACTION: FIND A HOUSE (Sky Blue)
       item {
         Spacer(modifier = Modifier.height(20.dp))
         Column(
@@ -289,7 +288,7 @@ fun HomeScreen(
             .padding(horizontal = 20.dp),
           verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-          // Large Button 1: FIND A HOUSE - Sky Blue with white text
+          // Large Button: FIND A HOUSE - Sky Blue with white text
           Button(
             onClick = { onNavigateToFindHouses(searchQuery.ifEmpty { selectedArea }) },
             modifier = Modifier
@@ -339,62 +338,6 @@ fun HomeScreen(
                   text = DwelloStrings.findHouseSubtext(currentLanguage),
                   style = MaterialTheme.typography.labelSmall.copy(
                     color = Color.White.copy(alpha = 0.9f)
-                  )
-                )
-              }
-            }
-          }
-
-          // Large Button 2: POST A HOUSE - White with Sky Blue border and blue text
-          OutlinedButton(
-            onClick = { onNavigateToPostHouse() },
-            modifier = Modifier
-              .fillMaxWidth()
-              .height(64.dp)
-              .testTag("post_a_house_button"),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(2.dp, SkyBluePrimary),
-            colors = ButtonDefaults.outlinedButtonColors(
-              containerColor = Color.White,
-              contentColor = SkyBluePrimary
-            )
-          ) {
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.Center
-            ) {
-              Box(
-                modifier = Modifier
-                  .size(38.dp)
-                  .clip(CircleShape)
-                  .background(SoftBlueAccent),
-                contentAlignment = Alignment.Center
-              ) {
-                Icon(
-                  imageVector = Icons.Default.AddHome,
-                  contentDescription = null,
-                  tint = SkyBluePrimary,
-                  modifier = Modifier.size(22.dp)
-                )
-              }
-
-              Spacer(modifier = Modifier.width(14.dp))
-
-              Column(horizontalAlignment = Alignment.Start) {
-                Text(
-                  text = DwelloStrings.postHouseButton(currentLanguage),
-                  style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 0.5.sp,
-                    fontSize = 17.sp,
-                    color = SkyBluePrimary
-                  )
-                )
-                Text(
-                  text = DwelloStrings.postHouseSubtext(currentLanguage),
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    color = NavyTextSecondary
                   )
                 )
               }
@@ -519,7 +462,9 @@ fun HomeScreen(
         }
 
         is AsyncResourceState.Success -> {
-          val displayedProperties = propertiesState.data.take(3)
+          val displayedProperties = propertiesState.data
+            .filter { it.approvalStatus == PropertyApprovalStatus.APPROVED && it.isAvailable }
+            .take(3)
           if (displayedProperties.isEmpty()) {
             item {
               Card(

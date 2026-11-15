@@ -177,27 +177,36 @@ class DwelloViewModel(
   }
 
   private fun onAuthenticatedSuccess(user: AuthenticatedUser) {
-    _uiState.update {
-      it.copy(
-        sessionStatus = SessionStatus.AUTHENTICATED,
-        currentUser = user,
-        authLoading = false,
-        authError = null
-      )
-    }
+    _uiState.value = DwelloUiState(
+      sessionStatus = SessionStatus.AUTHENTICATED,
+      currentUser = user,
+      authLoading = false,
+      authError = null
+    )
     when (user.role) {
       AuthAccountRole.TENANT -> loadTenantData()
       AuthAccountRole.LANDLORD -> loadLandlordData()
     }
   }
 
+  private fun currentRole(): AuthAccountRole? {
+    val state = _uiState.value
+    return if (state.sessionStatus == SessionStatus.AUTHENTICATED) {
+      state.currentUser?.role
+    } else {
+      null
+    }
+  }
+
   fun loadTenantData() {
+    if (!com.example.data.RoleNavigationRouter.canBrowseApprovedProperties(currentRole())) return
     loadApprovedProperties()
     loadFavourites()
     loadTenantEnquiries()
   }
 
   fun loadApprovedProperties() {
+    if (!com.example.data.RoleNavigationRouter.canBrowseApprovedProperties(currentRole())) return
     _uiState.update { it.copy(approvedPropertiesState = AsyncResourceState.Loading) }
     viewModelScope.launch {
       when (val result = repository.getApprovedProperties()) {
@@ -213,6 +222,7 @@ class DwelloViewModel(
   }
 
   fun loadFavourites() {
+    if (!com.example.data.RoleNavigationRouter.canBrowseApprovedProperties(currentRole())) return
     viewModelScope.launch {
       when (val result = repository.getFavourites()) {
         is DwelloApiResult.Success -> {
@@ -228,6 +238,7 @@ class DwelloViewModel(
   }
 
   fun toggleFavourite(propertyId: String) {
+    if (!com.example.data.RoleNavigationRouter.canBrowseApprovedProperties(currentRole())) return
     if (_uiState.value.favouriteActionIds.contains(propertyId)) return
     val currentlyFav = _uiState.value.favouriteIds.contains(propertyId)
     _uiState.update {
@@ -270,6 +281,7 @@ class DwelloViewModel(
   }
 
   fun openPropertyDetails(propertySummary: PropertyItem) {
+    if (!com.example.data.RoleNavigationRouter.canAccessPropertyDetails(currentRole())) return
     // Immediately open details with loading/summary, then fetch live full details + images from GET /api/properties/{id}
     _uiState.update {
       it.copy(selectedPropertyDetailState = AsyncResourceState.Loading)
@@ -296,6 +308,7 @@ class DwelloViewModel(
   }
 
   fun loadTenantEnquiries() {
+    if (!com.example.data.RoleNavigationRouter.canSubmitPropertyEnquiry(currentRole())) return
     _uiState.update { it.copy(tenantEnquiriesState = AsyncResourceState.Loading) }
     viewModelScope.launch {
       when (val result = repository.getTenantEnquiries()) {
@@ -315,6 +328,7 @@ class DwelloViewModel(
     message: String?,
     preferredInspectionDate: String?
   ) {
+    if (!com.example.data.RoleNavigationRouter.canSubmitPropertyEnquiry(currentRole())) return
     if (_uiState.value.enquirySubmitting) return
     _uiState.update {
       it.copy(
@@ -360,6 +374,7 @@ class DwelloViewModel(
   }
 
   fun loadLandlordData() {
+    if (!com.example.data.RoleNavigationRouter.canAccessLandlordManagement(currentRole())) return
     _uiState.update {
       it.copy(
         landlordPropertiesState = AsyncResourceState.Loading,
@@ -395,6 +410,7 @@ class DwelloViewModel(
   }
 
   fun loadLandlordEnquiries() {
+    if (!com.example.data.RoleNavigationRouter.canAccessLandlordManagement(currentRole())) return
     _uiState.update { it.copy(landlordEnquiriesState = AsyncResourceState.Loading) }
     viewModelScope.launch {
       when (val result = repository.getLandlordEnquiries()) {
@@ -421,6 +437,7 @@ class DwelloViewModel(
     fullAddress: String,
     landmark: String?
   ) {
+    if (!com.example.data.RoleNavigationRouter.canAccessLandlordManagement(currentRole())) return
     if (_uiState.value.postPropertyLoading) return
     _uiState.update {
       it.copy(
@@ -487,6 +504,7 @@ class DwelloViewModel(
     fullAddress: String?,
     landmark: String?
   ) {
+    if (!com.example.data.RoleNavigationRouter.canAccessLandlordManagement(currentRole())) return
     if (_uiState.value.landlordActionLoading) return
     _uiState.update {
       it.copy(landlordActionLoading = true, landlordActionError = null, landlordActionMessage = null)
@@ -526,6 +544,12 @@ class DwelloViewModel(
   }
 
   fun togglePropertyAvailability(property: PropertyItem) {
+    if (!com.example.data.RoleNavigationRouter.canAccessLandlordManagement(currentRole())) return
+    if (property.approvalStatus != com.example.data.PropertyApprovalStatus.APPROVED &&
+      property.approvalStatus != com.example.data.PropertyApprovalStatus.UNAVAILABLE
+    ) {
+      return
+    }
     if (_uiState.value.landlordActionLoading) return
     val makeAvailable = property.approvalStatus == com.example.data.PropertyApprovalStatus.UNAVAILABLE
     _uiState.update {
@@ -561,6 +585,7 @@ class DwelloViewModel(
   }
 
   fun updateEnquiryStatus(enquiryId: String, newStatus: EnquiryStatus) {
+    if (!com.example.data.RoleNavigationRouter.canAccessLandlordManagement(currentRole())) return
     if (_uiState.value.landlordActionLoading) return
     _uiState.update {
       it.copy(landlordActionLoading = true, landlordActionError = null, landlordActionMessage = null)

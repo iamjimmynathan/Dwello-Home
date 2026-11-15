@@ -374,13 +374,13 @@ class LoginFirstAccessRobolectricTest {
     composeTestRule.onNodeWithTag("messages_list")
       .performScrollToNode(hasTestTag("enquiry_card_enq_1"))
 
-    // Attempting to open Post House shows Role Access Notice
-    composeTestRule.onNodeWithTag("nav_item_post_house").performClick()
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithText("Role Access Notice").assertIsDisplayed()
+    // Tenant must NOT see Post House tab, My Properties tab, or Home Post a House CTA
+    composeTestRule.onNodeWithTag("nav_item_post_house").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("nav_item_my_properties").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("post_a_house_button").assertDoesNotExist()
 
-    // Navigate to Profile via Role Access Notice and verify no client-side role switcher exists
-    composeTestRule.onNodeWithTag("role_notice_go_to_profile_btn").performClick()
+    // Navigate to Profile via Tenant bottom nav and verify no client-side role switcher exists
+    composeTestRule.onNodeWithTag("nav_item_profile").performClick()
     waitForTag("profile_scroll_view")
     composeTestRule.onNodeWithTag("profile_user_name").assertIsDisplayed()
     composeTestRule.onNodeWithTag("profile_user_role_badge").assertIsDisplayed()
@@ -414,7 +414,14 @@ class LoginFirstAccessRobolectricTest {
     composeTestRule.onNodeWithTag("login_password_input").performTextInput("Password123")
     composeTestRule.onNodeWithTag("login_submit_button").performScrollTo().performClick()
 
-    // Lands on Landlord Dashboard with live properties
+    // Lands on Landlord Home first, with Find Houses hidden from Landlord nav
+    waitForTag("landlord_home_scroll")
+    composeTestRule.onNodeWithTag("nav_item_find_houses").assertDoesNotExist()
+    composeTestRule.onNodeWithTag("nav_item_my_properties").assertIsDisplayed()
+    assertEquals("live-jwt-landlord", tokenStore.getSessionToken())
+
+    // Navigate to My Properties tab (Landlord Dashboard)
+    composeTestRule.onNodeWithTag("nav_item_my_properties").performClick()
     waitForTag("landlord_dashboard_scroll")
     composeTestRule.waitUntil(timeoutMillis = 5_000) {
       apiState.calledPaths.contains("GET /api/landlord/properties") &&
@@ -422,7 +429,6 @@ class LoginFirstAccessRobolectricTest {
     }
     composeTestRule.onNodeWithTag("landlord_dashboard_scroll")
       .performScrollToNode(hasTestTag("landlord_property_card_lp_1"))
-    assertEquals("live-jwt-landlord", tokenStore.getSessionToken())
 
     // Toggle availability calls PATCH /api/properties/lp_1/availability
     composeTestRule.onNodeWithTag("toggle_availability_button_lp_1").performScrollTo().performClick()
@@ -435,12 +441,8 @@ class LoginFirstAccessRobolectricTest {
     composeTestRule.onNodeWithText("OK").performClick()
     composeTestRule.waitForIdle()
 
-    // Landlord attempting to open tenant-only Find Houses gets Role Access Notice
-    composeTestRule.onNodeWithTag("nav_item_find_houses").performClick()
-    composeTestRule.waitForIdle()
-    composeTestRule.onNodeWithText("Role Access Notice").assertIsDisplayed()
-
-    composeTestRule.onNodeWithTag("role_notice_go_to_profile_btn").performClick()
+    // Navigate to Profile cleanly
+    composeTestRule.onNodeWithTag("nav_item_profile").performClick()
     waitForTag("profile_scroll_view")
   }
 

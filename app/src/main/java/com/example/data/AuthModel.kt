@@ -229,12 +229,12 @@ object AuthFormValidator {
 /**
  * Role-based navigation guard and login-first access router.
  * - Unauthenticated users (role == null) may ONLY access Auth screens (WELCOME, ACCOUNT_TYPE_SELECTION, REGISTRATION, LOGIN, FORGOT_PASSWORD).
- * - Unauthenticated users cannot access HOME, FIND_HOUSES, property details, enquiries, or landlord dashboards.
- * - TENANT lands on Tenant Home screen (HOME) and can browse approved/available properties, details, and enquiries.
- * - LANDLORD lands on Landlord Dashboard (LANDLORD_DASHBOARD) and can manage properties and enquiries.
- * - Tenants cannot access landlord-only screens (LANDLORD_DASHBOARD, POST_HOUSE).
- * - Landlords cannot access tenant-only screens (HOME, FIND_HOUSES).
- * - MESSAGES and PROFILE are shared screens for authenticated users.
+ * - Unauthenticated users cannot access HOME, LANDLORD_HOME, FIND_HOUSES, POST_HOUSE, MESSAGES, PROFILE, or LANDLORD_DASHBOARD.
+ * - TENANT bottom nav (4 items): HOME, FIND_HOUSES, MESSAGES, PROFILE.
+ *   Tenants cannot access LANDLORD_HOME, POST_HOUSE, or LANDLORD_DASHBOARD.
+ * - LANDLORD bottom nav (5 items): LANDLORD_HOME, POST_HOUSE, LANDLORD_DASHBOARD (My Properties), MESSAGES, PROFILE.
+ *   Landlords cannot access tenant HOME or FIND_HOUSES.
+ * - Admin approval/rejection actions are never exposed to Tenant or Landlord accounts.
  */
 object RoleNavigationRouter {
   fun isAuthScreen(screen: DwelloNavScreen): Boolean {
@@ -246,6 +246,7 @@ object RoleNavigationRouter {
       DwelloNavScreen.FORGOT_PASSWORD -> true
 
       DwelloNavScreen.HOME,
+      DwelloNavScreen.LANDLORD_HOME,
       DwelloNavScreen.FIND_HOUSES,
       DwelloNavScreen.POST_HOUSE,
       DwelloNavScreen.MESSAGES,
@@ -257,7 +258,26 @@ object RoleNavigationRouter {
   fun postLoginDestination(role: AuthAccountRole): DwelloNavScreen {
     return when (role) {
       AuthAccountRole.TENANT -> DwelloNavScreen.HOME
-      AuthAccountRole.LANDLORD -> DwelloNavScreen.LANDLORD_DASHBOARD
+      AuthAccountRole.LANDLORD -> DwelloNavScreen.LANDLORD_HOME
+    }
+  }
+
+  fun bottomNavScreensForRole(role: AuthAccountRole?): List<DwelloNavScreen> {
+    return when (role) {
+      AuthAccountRole.TENANT -> listOf(
+        DwelloNavScreen.HOME,
+        DwelloNavScreen.FIND_HOUSES,
+        DwelloNavScreen.MESSAGES,
+        DwelloNavScreen.PROFILE
+      )
+      AuthAccountRole.LANDLORD -> listOf(
+        DwelloNavScreen.LANDLORD_HOME,
+        DwelloNavScreen.POST_HOUSE,
+        DwelloNavScreen.LANDLORD_DASHBOARD,
+        DwelloNavScreen.MESSAGES,
+        DwelloNavScreen.PROFILE
+      )
+      null -> emptyList()
     }
   }
 
@@ -272,6 +292,7 @@ object RoleNavigationRouter {
       DwelloNavScreen.HOME,
       DwelloNavScreen.FIND_HOUSES -> role == AuthAccountRole.TENANT
 
+      DwelloNavScreen.LANDLORD_HOME,
       DwelloNavScreen.LANDLORD_DASHBOARD,
       DwelloNavScreen.POST_HOUSE -> role == AuthAccountRole.LANDLORD
 
@@ -297,6 +318,11 @@ object RoleNavigationRouter {
 
   fun canAccessLandlordManagement(role: AuthAccountRole?): Boolean {
     return role == AuthAccountRole.LANDLORD
+  }
+
+  fun canApproveOrRejectListings(role: AuthAccountRole?): Boolean {
+    // Approval/rejection is exclusively reserved for Dwello Homes administrators outside public mobile roles.
+    return false
   }
 
   fun redirectUnauthenticatedTarget(

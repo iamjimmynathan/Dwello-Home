@@ -16,11 +16,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddHome
+import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.AddHome
+import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
@@ -50,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -66,6 +69,7 @@ import com.example.ui.screens.FindHousesScreen
 import com.example.ui.screens.ForgotPasswordScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.LandlordDashboardScreen
+import com.example.ui.screens.LandlordHomeScreen
 import com.example.ui.screens.LoginScreen
 import com.example.ui.screens.MessagesScreen
 import com.example.ui.screens.PostHouseScreen
@@ -86,6 +90,7 @@ enum class DwelloNavScreen {
   LOGIN,
   FORGOT_PASSWORD,
   HOME,
+  LANDLORD_HOME,
   FIND_HOUSES,
   POST_HOUSE,
   MESSAGES,
@@ -135,13 +140,14 @@ fun DwelloApp(repository: DwelloRepository? = null) {
     null
   }
 
-  // Synchronize auth state transitions automatically
+  // Synchronize auth state transitions automatically and clear navigation state on logout/role switch
   LaunchedEffect(uiState.sessionStatus, authenticatedRole) {
     when (uiState.sessionStatus) {
       SessionStatus.RESTORING -> Unit
       SessionStatus.AUTHENTICATED -> {
         val role = authenticatedRole
         if (role != null) {
+          initialSearchQuery = null
           if (RoleNavigationRouter.isAuthScreen(currentScreen) ||
             !RoleNavigationRouter.canAccessScreen(role, currentScreen)
           ) {
@@ -152,6 +158,8 @@ fun DwelloApp(repository: DwelloRepository? = null) {
       }
       SessionStatus.UNAUTHENTICATED -> {
         roleRestrictedTarget = null
+        initialSearchQuery = null
+        selectedRegistrationRole = AuthAccountRole.TENANT
         if (!RoleNavigationRouter.isAuthScreen(currentScreen)) {
           currentScreen = DwelloNavScreen.WELCOME
         }
@@ -195,13 +203,22 @@ fun DwelloApp(repository: DwelloRepository? = null) {
     return
   }
 
-  val effectiveScreen = RoleNavigationRouter.redirectUnauthenticatedTarget(
+  val unauthCheckedScreen = RoleNavigationRouter.redirectUnauthenticatedTarget(
     role = authenticatedRole,
     requestedScreen = currentScreen
   )
-  val isAuthScreen = RoleNavigationRouter.isAuthScreen(effectiveScreen)
   val roleHomeScreen = authenticatedRole?.let { RoleNavigationRouter.postLoginDestination(it) }
     ?: DwelloNavScreen.WELCOME
+  val effectiveScreen = if (
+    authenticatedRole != null &&
+    !RoleNavigationRouter.isAuthScreen(unauthCheckedScreen) &&
+    !RoleNavigationRouter.canAccessScreen(authenticatedRole, unauthCheckedScreen)
+  ) {
+    roleHomeScreen
+  } else {
+    unauthCheckedScreen
+  }
+  val isAuthScreen = RoleNavigationRouter.isAuthScreen(effectiveScreen)
 
   fun toggleLanguage() {
     currentLanguage = if (currentLanguage == AppLanguage.ENGLISH) {
@@ -229,181 +246,107 @@ fun DwelloApp(repository: DwelloRepository? = null) {
   // Handle system back navigation for secondary main app screens (auth screens manage their own backstack)
   if (!isAuthScreen && effectiveScreen != roleHomeScreen) {
     BackHandler {
-      currentScreen = if (effectiveScreen == DwelloNavScreen.POST_HOUSE && authenticatedRole == AuthAccountRole.LANDLORD) {
-        DwelloNavScreen.LANDLORD_DASHBOARD
-      } else {
-        roleHomeScreen
-      }
+      currentScreen = roleHomeScreen
     }
   }
 
   Scaffold(
     modifier = Modifier.fillMaxSize(),
     bottomBar = {
-      if (!isAuthScreen && authenticatedRole != null) {
+      val navItems = RoleNavigationRouter.bottomNavScreensForRole(authenticatedRole)
+      if (!isAuthScreen && authenticatedRole != null && navItems.isNotEmpty()) {
+        val labelFontSize = if (navItems.size >= 5) 10.sp else 11.sp
         NavigationBar(
           containerColor = Color.White,
           contentColor = DeepNavyText,
           tonalElevation = 6.dp,
           modifier = Modifier.testTag("bottom_nav_bar")
         ) {
-          // 1. Home (Tenant)
-          val isHome = effectiveScreen == DwelloNavScreen.HOME
-          NavigationBarItem(
-            selected = isHome,
-            onClick = { navigateWithRoleGuard(DwelloNavScreen.HOME) },
-            icon = {
-              Icon(
-                imageVector = if (isHome) Icons.Filled.Home else Icons.Outlined.Home,
-                contentDescription = "Home",
-                modifier = Modifier.size(24.dp)
+          navItems.forEach { navScreen ->
+            val isSelected = effectiveScreen == navScreen
+            val (labelText, selectedIcon, unselectedIcon, tag) = when (navScreen) {
+              DwelloNavScreen.HOME,
+              DwelloNavScreen.LANDLORD_HOME -> QuadIconItem(
+                label = DwelloStrings.navHome(currentLanguage),
+                selectedIcon = Icons.Filled.Home,
+                unselectedIcon = Icons.Outlined.Home,
+                testTag = "nav_item_home"
               )
-            },
-            label = {
-              Text(
-                text = DwelloStrings.navHome(currentLanguage),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = if (isHome) FontWeight.Bold else FontWeight.Medium,
-                  fontSize = 11.sp
-                )
+              DwelloNavScreen.FIND_HOUSES -> QuadIconItem(
+                label = DwelloStrings.navFind(currentLanguage),
+                selectedIcon = Icons.Filled.Search,
+                unselectedIcon = Icons.Outlined.Search,
+                testTag = "nav_item_find_houses"
               )
-            },
-            colors = NavigationBarItemDefaults.colors(
-              selectedIconColor = SkyBluePrimary,
-              selectedTextColor = SkyBluePrimary,
-              unselectedIconColor = NavyTextSecondary,
-              unselectedTextColor = NavyTextSecondary,
-              indicatorColor = SoftBlueAccent
-            ),
-            modifier = Modifier.testTag("nav_item_home")
-          )
+              DwelloNavScreen.POST_HOUSE -> QuadIconItem(
+                label = DwelloStrings.navPost(currentLanguage),
+                selectedIcon = Icons.Filled.AddHome,
+                unselectedIcon = Icons.Outlined.AddHome,
+                testTag = "nav_item_post_house"
+              )
+              DwelloNavScreen.LANDLORD_DASHBOARD -> QuadIconItem(
+                label = DwelloStrings.navMyProperties(currentLanguage),
+                selectedIcon = Icons.Filled.Apartment,
+                unselectedIcon = Icons.Outlined.Apartment,
+                testTag = "nav_item_my_properties"
+              )
+              DwelloNavScreen.MESSAGES -> QuadIconItem(
+                label = DwelloStrings.navMessages(currentLanguage),
+                selectedIcon = Icons.Filled.Chat,
+                unselectedIcon = Icons.Outlined.Chat,
+                testTag = "nav_item_messages"
+              )
+              DwelloNavScreen.PROFILE -> QuadIconItem(
+                label = DwelloStrings.navProfile(currentLanguage),
+                selectedIcon = Icons.Filled.Person,
+                unselectedIcon = Icons.Outlined.Person,
+                testTag = "nav_item_profile"
+              )
+              else -> QuadIconItem(
+                label = DwelloStrings.navHome(currentLanguage),
+                selectedIcon = Icons.Filled.Home,
+                unselectedIcon = Icons.Outlined.Home,
+                testTag = "nav_item_home"
+              )
+            }
 
-          // 2. Find Houses (Tenant)
-          val isFind = effectiveScreen == DwelloNavScreen.FIND_HOUSES
-          NavigationBarItem(
-            selected = isFind,
-            onClick = {
-              initialSearchQuery = null
-              navigateWithRoleGuard(DwelloNavScreen.FIND_HOUSES)
-            },
-            icon = {
-              Icon(
-                imageVector = if (isFind) Icons.Filled.Search else Icons.Outlined.Search,
-                contentDescription = "Find Houses",
-                modifier = Modifier.size(24.dp)
-              )
-            },
-            label = {
-              Text(
-                text = DwelloStrings.navFind(currentLanguage),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = if (isFind) FontWeight.Bold else FontWeight.Medium,
-                  fontSize = 11.sp
+            NavigationBarItem(
+              selected = isSelected,
+              onClick = {
+                if (navScreen == DwelloNavScreen.FIND_HOUSES) {
+                  initialSearchQuery = null
+                }
+                navigateWithRoleGuard(navScreen)
+              },
+              icon = {
+                Icon(
+                  imageVector = if (isSelected) selectedIcon else unselectedIcon,
+                  contentDescription = labelText,
+                  modifier = Modifier.size(22.dp)
                 )
-              )
-            },
-            colors = NavigationBarItemDefaults.colors(
-              selectedIconColor = SkyBluePrimary,
-              selectedTextColor = SkyBluePrimary,
-              unselectedIconColor = NavyTextSecondary,
-              unselectedTextColor = NavyTextSecondary,
-              indicatorColor = SoftBlueAccent
-            ),
-            modifier = Modifier.testTag("nav_item_find_houses")
-          )
-
-          // 3. Post House (Landlord)
-          val isPost = effectiveScreen == DwelloNavScreen.POST_HOUSE
-          NavigationBarItem(
-            selected = isPost,
-            onClick = { navigateWithRoleGuard(DwelloNavScreen.POST_HOUSE) },
-            icon = {
-              Icon(
-                imageVector = if (isPost) Icons.Filled.AddHome else Icons.Outlined.AddHome,
-                contentDescription = "Post House",
-                modifier = Modifier.size(24.dp)
-              )
-            },
-            label = {
-              Text(
-                text = DwelloStrings.navPost(currentLanguage),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = if (isPost) FontWeight.Bold else FontWeight.Medium,
-                  fontSize = 11.sp
+              },
+              label = {
+                Text(
+                  text = labelText,
+                  maxLines = 1,
+                  softWrap = false,
+                  overflow = TextOverflow.Ellipsis,
+                  style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = labelFontSize
+                  )
                 )
-              )
-            },
-            colors = NavigationBarItemDefaults.colors(
-              selectedIconColor = SkyBluePrimary,
-              selectedTextColor = SkyBluePrimary,
-              unselectedIconColor = NavyTextSecondary,
-              unselectedTextColor = NavyTextSecondary,
-              indicatorColor = SoftBlueAccent
-            ),
-            modifier = Modifier.testTag("nav_item_post_house")
-          )
-
-          // 4. Enquiries (Shared)
-          val isMessages = effectiveScreen == DwelloNavScreen.MESSAGES
-          NavigationBarItem(
-            selected = isMessages,
-            onClick = { navigateWithRoleGuard(DwelloNavScreen.MESSAGES) },
-            icon = {
-              Icon(
-                imageVector = if (isMessages) Icons.Filled.Chat else Icons.Outlined.Chat,
-                contentDescription = "Enquiries",
-                modifier = Modifier.size(24.dp)
-              )
-            },
-            label = {
-              Text(
-                text = DwelloStrings.navMessages(currentLanguage),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = if (isMessages) FontWeight.Bold else FontWeight.Medium,
-                  fontSize = 11.sp
-                )
-              )
-            },
-            colors = NavigationBarItemDefaults.colors(
-              selectedIconColor = SkyBluePrimary,
-              selectedTextColor = SkyBluePrimary,
-              unselectedIconColor = NavyTextSecondary,
-              unselectedTextColor = NavyTextSecondary,
-              indicatorColor = SoftBlueAccent
-            ),
-            modifier = Modifier.testTag("nav_item_messages")
-          )
-
-          // 5. Profile
-          val isProfile = effectiveScreen == DwelloNavScreen.PROFILE || effectiveScreen == DwelloNavScreen.LANDLORD_DASHBOARD
-          NavigationBarItem(
-            selected = isProfile,
-            onClick = { navigateWithRoleGuard(DwelloNavScreen.PROFILE) },
-            icon = {
-              Icon(
-                imageVector = if (isProfile) Icons.Filled.Person else Icons.Outlined.Person,
-                contentDescription = "Profile",
-                modifier = Modifier.size(24.dp)
-              )
-            },
-            label = {
-              Text(
-                text = DwelloStrings.navProfile(currentLanguage),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = if (isProfile) FontWeight.Bold else FontWeight.Medium,
-                  fontSize = 11.sp
-                )
-              )
-            },
-            colors = NavigationBarItemDefaults.colors(
-              selectedIconColor = SkyBluePrimary,
-              selectedTextColor = SkyBluePrimary,
-              unselectedIconColor = NavyTextSecondary,
-              unselectedTextColor = NavyTextSecondary,
-              indicatorColor = SoftBlueAccent
-            ),
-            modifier = Modifier.testTag("nav_item_profile")
-          )
+              },
+              colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = SkyBluePrimary,
+                selectedTextColor = SkyBluePrimary,
+                unselectedIconColor = NavyTextSecondary,
+                unselectedTextColor = NavyTextSecondary,
+                indicatorColor = SoftBlueAccent
+              ),
+              modifier = Modifier.testTag(tag)
+            )
+          }
         }
       }
     }
@@ -418,6 +361,7 @@ fun DwelloApp(repository: DwelloRepository? = null) {
         DwelloNavScreen.WELCOME -> {
           WelcomeScreen(
             currentLanguage = currentLanguage,
+            authError = uiState.authError,
             onLanguageToggle = ::toggleLanguage,
             onGetStartedClick = {
               dwelloViewModel.clearAuthError()
@@ -517,9 +461,6 @@ fun DwelloApp(repository: DwelloRepository? = null) {
                 initialSearchQuery = query
                 navigateWithRoleGuard(DwelloNavScreen.FIND_HOUSES)
               },
-              onNavigateToPostHouse = {
-                navigateWithRoleGuard(DwelloNavScreen.POST_HOUSE)
-              },
               onRetryLoadProperties = { dwelloViewModel.loadTenantData() },
               onToggleFavourite = { id -> dwelloViewModel.toggleFavourite(id) },
               onOpenPropertyDetails = { prop -> dwelloViewModel.openPropertyDetails(prop) },
@@ -528,6 +469,29 @@ fun DwelloApp(repository: DwelloRepository? = null) {
                 dwelloViewModel.submitEnquiry(propId, message, date)
               },
               onResetEnquiryState = { dwelloViewModel.resetEnquirySubmissionState() }
+            )
+          }
+        }
+
+        DwelloNavScreen.LANDLORD_HOME -> {
+          if (authenticatedRole == AuthAccountRole.LANDLORD) {
+            LandlordHomeScreen(
+              currentLanguage = currentLanguage,
+              currentUser = authenticatedUser,
+              propertiesState = uiState.landlordPropertiesState,
+              enquiriesState = uiState.landlordEnquiriesState,
+              onLanguageToggle = ::toggleLanguage,
+              onRefreshData = { dwelloViewModel.loadLandlordData() },
+              onNavigateToPostHouse = {
+                dwelloViewModel.resetPostPropertyState()
+                navigateWithRoleGuard(DwelloNavScreen.POST_HOUSE)
+              },
+              onNavigateToMyProperties = {
+                navigateWithRoleGuard(DwelloNavScreen.LANDLORD_DASHBOARD)
+              },
+              onNavigateToEnquiries = {
+                navigateWithRoleGuard(DwelloNavScreen.MESSAGES)
+              }
             )
           }
         }
@@ -589,7 +553,7 @@ fun DwelloApp(repository: DwelloRepository? = null) {
                 navigateWithRoleGuard(DwelloNavScreen.LANDLORD_DASHBOARD)
               },
               onBack = {
-                navigateWithRoleGuard(DwelloNavScreen.LANDLORD_DASHBOARD)
+                navigateWithRoleGuard(DwelloNavScreen.LANDLORD_HOME)
               }
             )
           }
@@ -681,7 +645,7 @@ fun DwelloApp(repository: DwelloRepository? = null) {
               },
               onClearFeedback = { dwelloViewModel.clearLandlordFeedback() },
               onBackToHome = {
-                currentScreen = DwelloNavScreen.PROFILE
+                navigateWithRoleGuard(DwelloNavScreen.LANDLORD_HOME)
               }
             )
           }
@@ -743,3 +707,10 @@ fun DwelloApp(repository: DwelloRepository? = null) {
     )
   }
 }
+
+private data class QuadIconItem(
+  val label: String,
+  val selectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
+  val unselectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
+  val testTag: String
+)

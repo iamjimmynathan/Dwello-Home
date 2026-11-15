@@ -155,10 +155,10 @@ fun FindHousesScreen(
     "Ogida"
   )
 
-  // Public search ONLY shows APPROVED properties returned from GET /api/properties
+  // Public search ONLY shows APPROVED & available properties returned from GET /api/properties
   val approvedProperties = when (propertiesState) {
     is AsyncResourceState.Success -> propertiesState.data.filter {
-      it.approvalStatus == PropertyApprovalStatus.APPROVED
+      it.approvalStatus == PropertyApprovalStatus.APPROVED && it.isAvailable
     }
     else -> emptyList()
   }

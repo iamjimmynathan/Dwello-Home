@@ -205,6 +205,11 @@ object DwelloStrings {
     AppLanguage.PIDGIN -> "Post House"
   }
 
+  fun navMyProperties(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "My Properties"
+    AppLanguage.PIDGIN -> "My Houses"
+  }
+
   fun navMessages(lang: AppLanguage): String = when (lang) {
     AppLanguage.ENGLISH -> "Enquiries"
     AppLanguage.PIDGIN -> "Enquiries"
@@ -864,5 +869,161 @@ object DwelloStrings {
   fun logoutToWelcomeBtn(lang: AppLanguage): String = when (lang) {
     AppLanguage.ENGLISH -> "Log Out"
     AppLanguage.PIDGIN -> "Log Out"
+  }
+
+  // --- 5-STEP POST A HOUSE WIZARD STRINGS ---
+  fun stepProgressLabel(lang: AppLanguage, step: Int, total: Int = 5): String = when (lang) {
+    AppLanguage.ENGLISH -> "Step $step of $total"
+    AppLanguage.PIDGIN -> "Step $step inside $total"
+  }
+
+  fun stepTitle(lang: AppLanguage, step: Int): String = when (step) {
+    1 -> if (lang == AppLanguage.ENGLISH) "Basic Information" else "Basic House Info"
+    2 -> if (lang == AppLanguage.ENGLISH) "Location" else "Where House Dey"
+    3 -> if (lang == AppLanguage.ENGLISH) "Rent & Facilities" else "Rent & Compound Things"
+    4 -> if (lang == AppLanguage.ENGLISH) "Property Photos" else "House Pictures"
+    else -> if (lang == AppLanguage.ENGLISH) "Review & Submit" else "Check Well & Submit"
+  }
+
+  fun nextStepBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Next"
+    AppLanguage.PIDGIN -> "Next"
+  }
+
+  fun previousStepBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Back"
+    AppLanguage.PIDGIN -> "Go Back"
+  }
+
+  fun cityLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "City"
+    AppLanguage.PIDGIN -> "City"
+  }
+
+  fun errorCityRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Please enter the city"
+    AppLanguage.PIDGIN -> "Please write the city name"
+  }
+
+  fun streetAreaDescriptionLabel(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Street or Area Description"
+    AppLanguage.PIDGIN -> "Street or Area Description"
+  }
+
+  fun streetAreaPlaceholder(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "e.g. 15 Boundary Road, off Sapele Road, near UBTH Gate"
+    AppLanguage.PIDGIN -> "e.g. 15 Boundary Road, near UBTH Gate"
+  }
+
+  fun errorStreetRequired(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Please describe the street or area"
+    AppLanguage.PIDGIN -> "Please describe the street or area"
+  }
+
+  fun replacePhotoBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Replace"
+    AppLanguage.PIDGIN -> "Change"
+  }
+
+  fun removePhotoBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Remove"
+    AppLanguage.PIDGIN -> "Remove"
+  }
+
+  fun addMorePhotosBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Add Property Photos"
+    AppLanguage.PIDGIN -> "Add House Pictures"
+  }
+
+  fun reviewHeaderTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Review Your Property Listing"
+    AppLanguage.PIDGIN -> "Check Your House Details Well"
+  }
+
+  fun reviewHeaderSubtitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Check every section below before submitting to Dwello Homes for admin approval."
+    AppLanguage.PIDGIN -> "Check every part below before you send am to Dwello Homes admin for approval."
+  }
+
+  fun editSectionBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Edit"
+    AppLanguage.PIDGIN -> "Edit"
+  }
+
+  fun submitForApprovalBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Submit for Approval"
+    AppLanguage.PIDGIN -> "Submit for Approval"
+  }
+
+  // Enhanced Landlord My Properties labels
+  fun submittedDatePrefix(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Submitted"
+    AppLanguage.PIDGIN -> "Date Wey You Submit"
+  }
+
+  fun viewPropertyDetailsBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "View Details"
+    AppLanguage.PIDGIN -> "See Details"
+  }
+
+  fun editPendingListingBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Edit Pending Listing"
+    AppLanguage.PIDGIN -> "Edit Pending House"
+  }
+
+  fun editAndResubmitBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Edit & Resubmit"
+    AppLanguage.PIDGIN -> "Edit & Send Again"
+  }
+
+  fun seeRejectionReasonBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "See Rejection Reason"
+    AppLanguage.PIDGIN -> "See Why Dem Reject Am"
+  }
+
+  // --- ROLE-BASED LANDLORD HOME STRINGS ---
+  fun landlordHomeWelcome(lang: AppLanguage, name: String): String = when (lang) {
+    AppLanguage.ENGLISH -> "Welcome, $name"
+    AppLanguage.PIDGIN -> "Welcome, $name"
+  }
+
+  fun landlordHomeSubtitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Manage your Benin City rental listings, post new houses, and follow tenant enquiries."
+    AppLanguage.PIDGIN -> "Manage your houses for Benin City, post new house, and check tenant enquiries."
+  }
+
+  fun landlordQuickActionsHeading(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Landlord Quick Actions"
+    AppLanguage.PIDGIN -> "Quick Landlord Actions"
+  }
+
+  fun landlordHomePostTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Post a New Property"
+    AppLanguage.PIDGIN -> "Put New House"
+  }
+
+  fun landlordHomePostDesc(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Submit house details and photos for Dwello Homes approval."
+    AppLanguage.PIDGIN -> "Send house details and pictures make Dwello Homes check am."
+  }
+
+  fun landlordHomePropertiesTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "View My Properties"
+    AppLanguage.PIDGIN -> "Check My Houses"
+  }
+
+  fun landlordHomePropertiesDesc(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Track Pending Approval, Approved & Live, or Rejected listings."
+    AppLanguage.PIDGIN -> "See Pending Approval, Approved, or Rejected houses."
+  }
+
+  fun landlordHomeEnquiriesTitle(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Tenant Enquiries"
+    AppLanguage.PIDGIN -> "Tenant Enquiries"
+  }
+
+  fun landlordHomeEnquiriesDesc(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Review and manage inspection enquiries from interested tenants."
+    AppLanguage.PIDGIN -> "Check and manage inspection requests from tenants."
   }
 }

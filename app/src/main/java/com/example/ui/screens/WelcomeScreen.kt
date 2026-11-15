@@ -22,8 +22,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -54,6 +57,7 @@ import com.example.ui.theme.VeryLightBlueBackground
 @Composable
 fun WelcomeScreen(
   currentLanguage: AppLanguage,
+  authError: String? = null,
   onLanguageToggle: () -> Unit,
   onGetStartedClick: () -> Unit,
   onLoginClick: () -> Unit,
@@ -193,7 +197,42 @@ fun WelcomeScreen(
           .testTag("welcome_supporting_text")
       )
 
-      Spacer(modifier = Modifier.height(38.dp))
+      Spacer(modifier = Modifier.height(26.dp))
+
+      if (!authError.isNullOrBlank()) {
+        Card(
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("welcome_auth_error_banner"),
+          shape = RoundedCornerShape(14.dp),
+          colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+          border = BorderStroke(1.dp, Color(0xFFFECACA))
+        ) {
+          Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = Color(0xFFDC2626),
+                modifier = Modifier.size(18.dp)
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Text(
+                text = authError,
+                style = MaterialTheme.typography.bodySmall.copy(
+                  color = Color(0xFF991B1B),
+                  fontWeight = FontWeight.Medium,
+                  lineHeight = 18.sp
+                ),
+                modifier = Modifier.weight(1f)
+              )
+            }
+          }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+      } else {
+        Spacer(modifier = Modifier.height(12.dp))
+      }
 
       // Get Started Button (Primary Sky Blue)
       Button(

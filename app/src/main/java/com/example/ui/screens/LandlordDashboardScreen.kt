@@ -129,6 +129,7 @@ fun LandlordDashboardScreen(
 ) {
   var selectedFilter by remember { mutableStateOf(LandlordPropertyFilter.ALL) }
   var propertyToEdit by remember { mutableStateOf<PropertyItem?>(null) }
+  var propertyToViewDetails by remember { mutableStateOf<PropertyItem?>(null) }
   var showEnquiriesDialog by remember { mutableStateOf(false) }
 
   val landlordProperties = when (propertiesState) {
@@ -594,6 +595,7 @@ fun LandlordDashboardScreen(
                 property = property,
                 currentLanguage = currentLanguage,
                 isActionLoading = isActionLoading,
+                onViewDetailsClick = { propertyToViewDetails = property },
                 onEditClick = { propertyToEdit = property },
                 onToggleAvailability = { onToggleAvailability(property) },
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -642,6 +644,19 @@ fun LandlordDashboardScreen(
         Spacer(modifier = Modifier.height(20.dp))
       }
     }
+  }
+
+  // Property Details Dialog (shows full info, photos, submission date, and rejection reason)
+  propertyToViewDetails?.let { prop ->
+    LandlordPropertyDetailsDialog(
+      property = prop,
+      currentLanguage = currentLanguage,
+      onEditClick = {
+        propertyToViewDetails = null
+        propertyToEdit = prop
+      },
+      onDismiss = { propertyToViewDetails = null }
+    )
   }
 
   // Edit Listing Dialog (PATCH /api/properties/{id})
@@ -770,6 +785,7 @@ fun LandlordPropertyCard(
   property: PropertyItem,
   currentLanguage: AppLanguage,
   isActionLoading: Boolean,
+  onViewDetailsClick: () -> Unit,
   onEditClick: () -> Unit,
   onToggleAvailability: () -> Unit,
   modifier: Modifier = Modifier
@@ -929,13 +945,27 @@ fun LandlordPropertyCard(
           style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
         )
 
-        if (property.approvalStatus == PropertyApprovalStatus.REJECTED && !property.rejectionReason.isNullOrBlank()) {
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+          text = "${DwelloStrings.submittedDatePrefix(currentLanguage)}: ${property.createdAtDisplay.ifBlank { "Submitted" }}",
+          style = MaterialTheme.typography.labelSmall.copy(
+            color = NavyTextSecondary,
+            fontWeight = FontWeight.SemiBold
+          ),
+          modifier = Modifier.testTag("landlord_property_submitted_date_${property.id}")
+        )
+
+        if (property.approvalStatus == PropertyApprovalStatus.REJECTED) {
+          val reasonText = property.rejectionReason?.takeIf { it.isNotBlank() }
+            ?: "This listing did not meet Dwello Homes verification requirements. Please edit and resubmit."
           Spacer(modifier = Modifier.height(10.dp))
           Surface(
             color = Color(0xFFFEF2F2),
             shape = RoundedCornerShape(10.dp),
             border = BorderStroke(1.dp, Color(0xFFFECACA)),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+              .fillMaxWidth()
+              .testTag("rejection_reason_box_${property.id}")
           ) {
             Column(modifier = Modifier.padding(10.dp)) {
               Row(verticalAlignment = Alignment.CenterVertically) {
@@ -956,7 +986,7 @@ fun LandlordPropertyCard(
               }
               Spacer(modifier = Modifier.height(4.dp))
               Text(
-                text = property.rejectionReason,
+                text = reasonText,
                 style = MaterialTheme.typography.bodySmall.copy(
                   color = Color(0xFF7F1D1D),
                   lineHeight = 18.sp,
@@ -1037,15 +1067,53 @@ fun LandlordPropertyCard(
         HorizontalDivider(color = SoftBlueBorder.copy(alpha = 0.5f))
         Spacer(modifier = Modifier.height(10.dp))
 
+        // Row 1: View Details + Edit Listing / Edit Pending Listing
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
           OutlinedButton(
-            onClick = onEditClick,
+            onClick = onViewDetailsClick,
             enabled = !isActionLoading,
             modifier = Modifier
               .weight(1f)
+              .height(48.dp)
+              .testTag("view_landlord_details_button_${property.id}"),
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.5.dp, SoftBlueBorder),
+            colors = ButtonDefaults.outlinedButtonColors(
+              containerColor = VeryLightBlueBackground,
+              contentColor = DeepNavyText
+            )
+          ) {
+            Icon(
+              imageVector = Icons.Default.Visibility,
+              contentDescription = null,
+              modifier = Modifier.size(16.dp),
+              tint = SkyBluePrimary
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+              text = DwelloStrings.viewPropertyDetailsBtn(currentLanguage),
+              style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = DeepNavyText,
+                fontSize = 12.sp
+              )
+            )
+          }
+
+          val editLabel = when (property.approvalStatus) {
+            PropertyApprovalStatus.PENDING_APPROVAL -> DwelloStrings.editPendingListingBtn(currentLanguage)
+            PropertyApprovalStatus.REJECTED -> DwelloStrings.editAndResubmitBtn(currentLanguage)
+            else -> DwelloStrings.editListingButton(currentLanguage)
+          }
+
+          OutlinedButton(
+            onClick = onEditClick,
+            enabled = !isActionLoading,
+            modifier = Modifier
+              .weight(1.2f)
               .height(48.dp)
               .testTag("edit_listing_button_${property.id}"),
             shape = RoundedCornerShape(10.dp),
@@ -1063,43 +1131,76 @@ fun LandlordPropertyCard(
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-              text = DwelloStrings.editListingButton(currentLanguage),
+              text = editLabel,
               style = MaterialTheme.typography.labelMedium.copy(
                 fontWeight = FontWeight.Bold,
-                color = SkyBluePrimary
+                color = SkyBluePrimary,
+                fontSize = 12.sp
               )
             )
           }
+        }
 
-          val isCurrentlyUnavailable = property.approvalStatus == PropertyApprovalStatus.UNAVAILABLE
+        // Row 2: Mark approved property as unavailable (only on APPROVED listings) or See Rejection Reason (on REJECTED)
+        if (property.approvalStatus == PropertyApprovalStatus.APPROVED) {
+          Spacer(modifier = Modifier.height(8.dp))
           Button(
             onClick = onToggleAvailability,
             enabled = !isActionLoading,
             modifier = Modifier
-              .weight(1.2f)
+              .fillMaxWidth()
               .height(48.dp)
               .testTag("toggle_availability_button_${property.id}"),
             shape = RoundedCornerShape(10.dp),
             colors = ButtonDefaults.buttonColors(
-              containerColor = if (isCurrentlyUnavailable) SkyBluePrimary else Color(0xFFF1F5F9),
-              contentColor = if (isCurrentlyUnavailable) Color.White else DeepNavyText
+              containerColor = Color(0xFFF1F5F9),
+              contentColor = DeepNavyText
             )
           ) {
             Icon(
-              imageVector = if (isCurrentlyUnavailable) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+              imageVector = Icons.Default.VisibilityOff,
               contentDescription = null,
               modifier = Modifier.size(16.dp),
-              tint = if (isCurrentlyUnavailable) Color.White else DeepNavyText
+              tint = DeepNavyText
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-              text = if (isCurrentlyUnavailable)
-                DwelloStrings.markAvailableButton(currentLanguage)
-              else
-                DwelloStrings.markUnavailableButton(currentLanguage),
+              text = DwelloStrings.markUnavailableButton(currentLanguage),
               style = MaterialTheme.typography.labelMedium.copy(
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp
+              )
+            )
+          }
+        } else if (property.approvalStatus == PropertyApprovalStatus.REJECTED) {
+          Spacer(modifier = Modifier.height(8.dp))
+          OutlinedButton(
+            onClick = onViewDetailsClick,
+            enabled = !isActionLoading,
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(48.dp)
+              .testTag("see_rejection_reason_button_${property.id}"),
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, Color(0xFFFECACA)),
+            colors = ButtonDefaults.outlinedButtonColors(
+              containerColor = Color(0xFFFEF2F2),
+              contentColor = Color(0xFF991B1B)
+            )
+          ) {
+            Icon(
+              imageVector = Icons.Default.Warning,
+              contentDescription = null,
+              modifier = Modifier.size(16.dp),
+              tint = Color(0xFFDC2626)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+              text = DwelloStrings.seeRejectionReasonBtn(currentLanguage),
+              style = MaterialTheme.typography.labelMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                color = Color(0xFF991B1B)
               )
             )
           }
@@ -1107,6 +1208,146 @@ fun LandlordPropertyCard(
       }
     }
   }
+}
+
+@Composable
+fun LandlordPropertyDetailsDialog(
+  property: PropertyItem,
+  currentLanguage: AppLanguage,
+  onEditClick: () -> Unit,
+  onDismiss: () -> Unit
+) {
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    modifier = Modifier.testTag("landlord_property_details_dialog"),
+    title = {
+      Text(
+        text = property.titleEn,
+        fontWeight = FontWeight.ExtraBold,
+        color = DeepNavyText,
+        fontSize = 18.sp
+      )
+    },
+    text = {
+      LazyColumn(modifier = Modifier.fillMaxWidth()) {
+        item {
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(150.dp)
+              .clip(RoundedCornerShape(12.dp))
+          ) {
+            if (property.photoUris.isNotEmpty()) {
+              AsyncImage(
+                model = property.photoUris.first(),
+                contentDescription = property.titleEn,
+                placeholder = painterResource(id = property.imageResId),
+                error = painterResource(id = property.imageResId),
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+              )
+            } else {
+              Image(
+                painter = painterResource(id = property.imageResId),
+                contentDescription = property.titleEn,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+              )
+            }
+          }
+          Spacer(modifier = Modifier.height(12.dp))
+
+          val periodText = if (property.rentalPeriod == RentalPeriod.MONTHLY) "/ month" else "/ year"
+          Text(
+            text = "${property.priceFormatted} $periodText",
+            style = MaterialTheme.typography.titleMedium.copy(
+              fontWeight = FontWeight.ExtraBold,
+              color = SkyBluePrimary
+            )
+          )
+          Spacer(modifier = Modifier.height(4.dp))
+          Text(
+            text = "${property.categoryEn} • ${property.bedrooms} Bed • ${property.bathrooms} Bath",
+            style = MaterialTheme.typography.bodySmall.copy(
+              fontWeight = FontWeight.SemiBold,
+              color = DeepNavyText
+            )
+          )
+          Spacer(modifier = Modifier.height(4.dp))
+          Text(
+            text = "${property.area}, Benin City • ${property.fullAddress.ifBlank { property.neighborhoodNote }}",
+            style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+          )
+          Spacer(modifier = Modifier.height(4.dp))
+          Text(
+            text = "${DwelloStrings.submittedDatePrefix(currentLanguage)}: ${property.createdAtDisplay.ifBlank { "Submitted" }}",
+            style = MaterialTheme.typography.labelSmall.copy(
+              color = NavyTextSecondary,
+              fontWeight = FontWeight.Bold
+            )
+          )
+
+          if (property.approvalStatus == PropertyApprovalStatus.REJECTED) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Surface(
+              color = Color(0xFFFEF2F2),
+              shape = RoundedCornerShape(10.dp),
+              border = BorderStroke(1.dp, Color(0xFFFECACA)),
+              modifier = Modifier.fillMaxWidth()
+            ) {
+              Column(modifier = Modifier.padding(10.dp)) {
+                Text(
+                  text = DwelloStrings.rejectionReasonTitle(currentLanguage),
+                  style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF991B1B)
+                  )
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                  text = property.rejectionReason?.takeIf { it.isNotBlank() }
+                    ?: "Listing rejected by Dwello Homes moderation team.",
+                  style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF7F1D1D))
+                )
+              }
+            }
+          }
+
+          Spacer(modifier = Modifier.height(10.dp))
+          Text(
+            text = property.descriptionEn,
+            style = MaterialTheme.typography.bodySmall.copy(
+              color = DeepNavyText,
+              lineHeight = 18.sp
+            )
+          )
+          if (property.facilities.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+              text = "Facilities: ${property.facilities.joinToString(", ")}",
+              style = MaterialTheme.typography.labelSmall.copy(
+                color = NavyTextSecondary,
+                fontWeight = FontWeight.SemiBold
+              )
+            )
+          }
+        }
+      }
+    },
+    confirmButton = {
+      Button(
+        onClick = onEditClick,
+        colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
+      ) {
+        Text(DwelloStrings.editListingButton(currentLanguage))
+      }
+    },
+    dismissButton = {
+      TextButton(onClick = onDismiss) {
+        Text("Close", color = NavyTextSecondary)
+      }
+    }
+  )
 }
 
 @Composable

@@ -450,42 +450,43 @@ fun ProfileScreen(
                   onClick = onNavigateToLandlordDashboard,
                   modifier = Modifier
                     .weight(1f)
-                    .height(42.dp),
+                    .height(48.dp),
                   shape = RoundedCornerShape(8.dp),
                   border = BorderStroke(1.dp, SkyBluePrimary),
-                  contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                  contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                   Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp), tint = SkyBluePrimary)
                   Spacer(modifier = Modifier.width(4.dp))
-                  Text("Edit Listing", fontSize = 12.sp, color = SkyBluePrimary, fontWeight = FontWeight.Bold)
+                  Text("Manage Listing", fontSize = 12.sp, color = SkyBluePrimary, fontWeight = FontWeight.Bold)
                 }
 
-                val isUnavailable = prop.approvalStatus == PropertyApprovalStatus.UNAVAILABLE
-                Button(
-                  onClick = { onToggleAvailability(prop) },
-                  enabled = !isActionLoading,
-                  modifier = Modifier
-                    .weight(1.2f)
-                    .height(42.dp),
-                  colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isUnavailable) SkyBluePrimary else Color(0xFFF1F5F9),
-                    contentColor = if (isUnavailable) Color.White else DeepNavyText
-                  ),
-                  shape = RoundedCornerShape(8.dp),
-                  contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                ) {
-                  Icon(
-                    imageVector = if (isUnavailable) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = if (isUnavailable) Color.White else DeepNavyText
-                  )
-                  Spacer(modifier = Modifier.width(4.dp))
-                  Text(
-                    text = if (isUnavailable) "Make Available" else "Mark Unavailable",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                  )
+                if (prop.approvalStatus == PropertyApprovalStatus.APPROVED) {
+                  Button(
+                    onClick = { onToggleAvailability(prop) },
+                    enabled = !isActionLoading,
+                    modifier = Modifier
+                      .weight(1.2f)
+                      .height(48.dp),
+                    colors = ButtonDefaults.buttonColors(
+                      containerColor = Color(0xFFF1F5F9),
+                      contentColor = DeepNavyText
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                  ) {
+                    Icon(
+                      imageVector = Icons.Default.VisibilityOff,
+                      contentDescription = null,
+                      modifier = Modifier.size(14.dp),
+                      tint = DeepNavyText
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                      text = "Mark Unavailable",
+                      fontSize = 11.sp,
+                      fontWeight = FontWeight.SemiBold
+                    )
+                  }
                 }
               }
             }

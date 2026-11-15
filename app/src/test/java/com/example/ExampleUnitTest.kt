@@ -13,9 +13,12 @@ import com.example.data.NigerianPhoneNormalizer
 import com.example.data.PropertyApprovalStatus
 import com.example.data.PropertyFormValidator
 import com.example.data.PropertyItem
+import com.example.data.PropertyPhotoValidator
 import com.example.data.PropertyTypeSlugMapper
 import com.example.data.RentalPeriod
 import com.example.data.RoleNavigationRouter
+import com.example.data.SamplePropertyData
+import com.example.data.SelectedPhotoItem
 import com.example.data.calculateLandlordStats
 import com.example.network.DwelloNetworkClient
 import com.example.network.EnquiryDto
@@ -225,9 +228,14 @@ class ExampleUnitTest {
   @Test
   fun testPropertyTypeSlugMapperAndMappersNeverExposePrivatePhone() {
     assertEquals("self_contained", PropertyTypeSlugMapper.toApiSlug("Self-contained"))
-    assertEquals("mini_flat", PropertyTypeSlugMapper.toApiSlug("Mini flat"))
-    assertEquals("2_bedroom", PropertyTypeSlugMapper.toApiSlug("2-bedroom apartment"))
-    assertEquals("2-bedroom apartment", PropertyTypeSlugMapper.toDisplayLabel("2_bedroom"))
+    assertEquals("mini_flat", PropertyTypeSlugMapper.toApiSlug("Mini Flat"))
+    assertEquals("2_bedroom", PropertyTypeSlugMapper.toApiSlug("2 Bedroom"))
+    assertEquals("2 Bedroom", PropertyTypeSlugMapper.toDisplayLabel("2_bedroom"))
+    assertEquals("shared_room", PropertyTypeSlugMapper.toApiSlug("Shared Accommodation"))
+    assertEquals("Shared Accommodation", PropertyTypeSlugMapper.toDisplayLabel("shared_room"))
+    SamplePropertyData.propertyTypesList.forEach { label ->
+      assertEquals(label, PropertyTypeSlugMapper.toDisplayLabel(PropertyTypeSlugMapper.toApiSlug(label)))
+    }
 
     val dto = PropertyDto(
       id = "prop_100",
@@ -289,13 +297,44 @@ class ExampleUnitTest {
 
     assertTrue(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.WELCOME))
     assertFalse(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.HOME))
+    assertFalse(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.LANDLORD_HOME))
     assertFalse(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.FIND_HOUSES))
     assertFalse(RoleNavigationRouter.canAccessScreen(null, DwelloNavScreen.LANDLORD_DASHBOARD))
+    assertTrue(RoleNavigationRouter.bottomNavScreensForRole(null).isEmpty())
 
     assertEquals(DwelloNavScreen.HOME, RoleNavigationRouter.postLoginDestination(AuthAccountRole.TENANT))
-    assertEquals(DwelloNavScreen.LANDLORD_DASHBOARD, RoleNavigationRouter.postLoginDestination(AuthAccountRole.LANDLORD))
+    assertEquals(DwelloNavScreen.LANDLORD_HOME, RoleNavigationRouter.postLoginDestination(AuthAccountRole.LANDLORD))
+
+    assertEquals(
+      listOf(
+        DwelloNavScreen.HOME,
+        DwelloNavScreen.FIND_HOUSES,
+        DwelloNavScreen.MESSAGES,
+        DwelloNavScreen.PROFILE
+      ),
+      RoleNavigationRouter.bottomNavScreensForRole(AuthAccountRole.TENANT)
+    )
+    assertEquals(
+      listOf(
+        DwelloNavScreen.LANDLORD_HOME,
+        DwelloNavScreen.POST_HOUSE,
+        DwelloNavScreen.LANDLORD_DASHBOARD,
+        DwelloNavScreen.MESSAGES,
+        DwelloNavScreen.PROFILE
+      ),
+      RoleNavigationRouter.bottomNavScreensForRole(AuthAccountRole.LANDLORD)
+    )
+
+    assertFalse(RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.LANDLORD_HOME))
     assertFalse(RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.LANDLORD_DASHBOARD))
+    assertFalse(RoleNavigationRouter.canAccessScreen(AuthAccountRole.TENANT, DwelloNavScreen.POST_HOUSE))
+
+    assertFalse(RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.HOME))
     assertFalse(RoleNavigationRouter.canAccessScreen(AuthAccountRole.LANDLORD, DwelloNavScreen.FIND_HOUSES))
+
+    assertFalse(RoleNavigationRouter.canApproveOrRejectListings(null))
+    assertFalse(RoleNavigationRouter.canApproveOrRejectListings(AuthAccountRole.TENANT))
+    assertFalse(RoleNavigationRouter.canApproveOrRejectListings(AuthAccountRole.LANDLORD))
   }
 
   @Test
@@ -635,5 +674,127 @@ class ExampleUnitTest {
 
     val enqUpdate = repo.updateEnquiryStatus("enq_5", EnquiryStatus.CONTACTED) as DwelloApiResult.Success
     assertEquals(EnquiryStatus.CONTACTED, enqUpdate.data)
+  }
+
+  @Test
+  fun testStepByStepFormValidationAndPhotoFileTypeValidation() {
+    // Step 1
+    val s1Invalid = PropertyFormValidator.validateStep1("", "", "   ")
+    assertFalse(s1Invalid.isValid)
+    assertNotNull(s1Invalid.titleError)
+    assertNotNull(s1Invalid.typeError)
+    assertNotNull(s1Invalid.descriptionError)
+    assertTrue(PropertyFormValidator.validateStep1("Clean 2 Bedroom in GRA", "2 Bedroom", "Spacious compound").isValid)
+
+    // Step 2
+    val s2Invalid = PropertyFormValidator.validateStep2("", "", "")
+    assertFalse(s2Invalid.isValid)
+    assertNotNull(s2Invalid.cityError)
+    assertNotNull(s2Invalid.neighbourhoodError)
+    assertNotNull(s2Invalid.streetError)
+    assertTrue(PropertyFormValidator.validateStep2("Benin City", "Ugbowo", "15 Technical College Road").isValid)
+
+    // Step 3
+    val s3Invalid = PropertyFormValidator.validateStep3(0L, 0, 0)
+    assertFalse(s3Invalid.isValid)
+    assertNotNull(s3Invalid.rentError)
+    assertNotNull(s3Invalid.bedroomsError)
+    assertNotNull(s3Invalid.bathroomsError)
+    assertTrue(PropertyFormValidator.validateStep3(450000L, 2, 2).isValid)
+
+    // Step 4 & Photo File Type Validation
+    assertFalse(PropertyFormValidator.validateStep4(emptyList()).isValid)
+    assertFalse(PropertyPhotoValidator.isSupportedImage("content://docs/lease.pdf", "application/pdf"))
+    assertFalse(PropertyPhotoValidator.isSupportedImage("content://videos/tour.mp4", "video/mp4"))
+    assertFalse(PropertyPhotoValidator.isSupportedImage("file:///storage/emulated/0/Download/terms.pdf", null))
+    assertTrue(PropertyPhotoValidator.isSupportedImage("content://media/external/images/media/101.jpg", "image/jpeg"))
+    assertTrue(PropertyPhotoValidator.isSupportedImage("file:///tmp/living_room.png", null))
+    assertTrue(PropertyPhotoValidator.isSupportedImage("content://media/picker/0/com.android.providers.media.photopicker/media/55", null))
+
+    val step4WithPdf = PropertyFormValidator.validateStep4(
+      listOf(SelectedPhotoItem("content://docs/lease.pdf", "application/pdf"))
+    )
+    assertFalse(step4WithPdf.isValid)
+    assertNotNull(step4WithPdf.photosError)
+
+    val step4Valid = PropertyFormValidator.validateStep4(
+      listOf(
+        SelectedPhotoItem("content://media/1.jpg", "image/jpeg"),
+        SelectedPhotoItem("content://media/2.png", "image/png")
+      )
+    )
+    assertTrue(step4Valid.isValid)
+  }
+
+  @Test
+  fun testPendingRejectedAndUnavailableListingsExcludedFromTenantApprovedSearch() = runBlocking {
+    val tokenStore = InMemorySessionTokenStore().apply {
+      saveSessionToken("tenant-token", null)
+    }
+    val (repo, _) = createMockedRepo(tokenStore) { _ ->
+      200 to """
+        {
+          "success": true,
+          "properties": [
+            {
+              "id": "p_approved_avail",
+              "title": "Approved Live 2 Bedroom",
+              "property_type": "2_bedroom",
+              "bedrooms": 2,
+              "bathrooms": 2,
+              "rent_amount": 600000,
+              "rent_period": "yearly",
+              "description": "Ready",
+              "neighbourhood": "GRA",
+              "moderation_status": "approved",
+              "availability_status": "available"
+            },
+            {
+              "id": "p_pending",
+              "title": "Pending Submission",
+              "property_type": "mini_flat",
+              "bedrooms": 1,
+              "bathrooms": 1,
+              "rent_amount": 300000,
+              "rent_period": "yearly",
+              "description": "Waiting",
+              "neighbourhood": "Ugbowo",
+              "moderation_status": "pending_approval",
+              "availability_status": "available"
+            },
+            {
+              "id": "p_rejected",
+              "title": "Rejected House",
+              "property_type": "self_contained",
+              "bedrooms": 1,
+              "bathrooms": 1,
+              "rent_amount": 200000,
+              "rent_period": "yearly",
+              "description": "Rejected",
+              "neighbourhood": "Ekosodin",
+              "moderation_status": "rejected",
+              "availability_status": "available",
+              "rejection_reason": "Blurry exterior photo"
+            },
+            {
+              "id": "p_approved_unavail",
+              "title": "Occupied Approved Flat",
+              "property_type": "3_bedroom",
+              "bedrooms": 3,
+              "bathrooms": 3,
+              "rent_amount": 900000,
+              "rent_period": "yearly",
+              "description": "Rented out",
+              "neighbourhood": "Sapele Road",
+              "moderation_status": "approved",
+              "availability_status": "unavailable"
+            }
+          ]
+        }
+      """.trimIndent()
+    }
+
+    val result = repo.getApprovedProperties() as DwelloApiResult.Success
+    assertEquals(listOf("p_approved_avail"), result.data.map { it.id })
   }
 }
