@@ -3,6 +3,9 @@ package com.example.data
 import com.example.R
 import com.example.network.CreateEnquiryRequest
 import com.example.network.CreatePropertyRequest
+import com.example.firebase.AndroidFirebaseSessionBridge
+import com.example.firebase.DwelloBackendConfig
+import com.example.firebase.FirebaseCustomTokenSessionBridge
 import com.example.network.DwelloApiService
 import com.example.network.DwelloNetworkClient
 import com.example.network.EnquiryDto
@@ -226,7 +229,8 @@ object DwelloMappers {
 
 open class DwelloRepository(
   private val apiService: DwelloApiService,
-  private val tokenStore: SessionTokenStore
+  private val tokenStore: SessionTokenStore,
+  private val firebaseSessionBridge: FirebaseCustomTokenSessionBridge? = null
 ) {
 
   fun hasStoredSession(): Boolean {
@@ -238,6 +242,12 @@ open class DwelloRepository(
   }
 
   suspend fun restoreSession(): DwelloApiResult<AuthenticatedUser> {
+    if (firebaseSessionBridge != null) {
+      val refreshedIdToken = firebaseSessionBridge.getCurrentFirebaseIdToken(forceRefresh = false)
+      if (!refreshedIdToken.isNullOrBlank()) {
+        tokenStore.saveSessionToken(refreshedIdToken, tokenStore.getSessionExpiresAt())
+      }
+    }
     if (!hasStoredSession()) {
       return DwelloApiResult.Error("No active session.", httpCode = 401, isUnauthorized = true)
     }
@@ -295,16 +305,34 @@ open class DwelloRepository(
           )
         },
         onSuccess = { body ->
-          DwelloApiResult.Success(body.message ?: "Registration successful", body.message)
+          DwelloApiResult.Success(body, body.message)
         }
       )
 
       when (regResult) {
         is DwelloApiResult.Error -> regResult
         is DwelloApiResult.Success -> {
-          // Live API /api/auth/register creates the user without returning a token;
-          // immediately log in to obtain and encrypt the Bearer session token.
-          loginInternal(normalizedPhone, passwordStr)
+          val regBody = regResult.data
+          val customToken = regBody.custom_token
+          val userDto = regBody.user
+          if (!customToken.isNullOrBlank() && firebaseSessionBridge != null) {
+            val mappedUser = userDto?.let { with(DwelloMappers) { it.toAuthenticatedUserOrNull() } }
+            if (mappedUser == null) {
+              tokenStore.clearSession()
+              val roleDesc = userDto?.role?.trim()?.ifEmpty { "missing" } ?: "missing"
+              DwelloApiResult.Error(
+                "Account verification required: account role '$roleDesc' is not valid. Please use a verified Tenant or Landlord account."
+              )
+            } else {
+              val idToken = firebaseSessionBridge.exchangeCustomTokenForIdToken(customToken)
+              tokenStore.saveSessionToken(idToken, null)
+              DwelloApiResult.Success(mappedUser, regBody.message)
+            }
+          } else {
+            // Cloudflare /api/auth/register creates the user without returning a token;
+            // immediately log in to obtain and encrypt the Bearer session token.
+            loginInternal(normalizedPhone, passwordStr)
+          }
         }
       }
     } finally {
@@ -338,10 +366,18 @@ open class DwelloRepository(
         )
       },
       onSuccess = { body ->
-        val token = body.token
+        val customToken = body.custom_token
+        val bearerToken = body.token
         val userDto = body.user
         val mappedUser = userDto?.let { with(DwelloMappers) { it.toAuthenticatedUserOrNull() } }
-        if (token.isNullOrBlank() || mappedUser == null) {
+        val resolvedToken = when {
+          !customToken.isNullOrBlank() && firebaseSessionBridge != null ->
+            firebaseSessionBridge.exchangeCustomTokenForIdToken(customToken)
+          !bearerToken.isNullOrBlank() -> bearerToken
+          else -> null
+        }
+
+        if (resolvedToken.isNullOrBlank() || mappedUser == null) {
           tokenStore.clearSession()
           val msg = if (userDto != null && mappedUser == null) {
             val roleDesc = userDto.role.trim().ifEmpty { "missing" }
@@ -351,7 +387,7 @@ open class DwelloRepository(
           }
           DwelloApiResult.Error(msg)
         } else {
-          tokenStore.saveSessionToken(token, body.expires_at)
+          tokenStore.saveSessionToken(resolvedToken, body.expires_at)
           DwelloApiResult.Success(mappedUser, body.message)
         }
       }
@@ -368,6 +404,7 @@ open class DwelloRepository(
     } else {
       DwelloApiResult.Success(Unit)
     }
+    firebaseSessionBridge?.signOutFirebase()
     tokenStore.clearSession()
     return remoteResult
   }
@@ -592,7 +629,7 @@ open class DwelloRepository(
 
   private suspend fun <Dto, Out> safeApiCall(
     call: suspend () -> Response<Dto>,
-    onSuccess: (Dto) -> DwelloApiResult<Out>
+    onSuccess: suspend (Dto) -> DwelloApiResult<Out>
   ): DwelloApiResult<Out> {
     return try {
       val response = call()
@@ -641,8 +678,16 @@ open class DwelloRepository(
 
   companion object {
     fun createDefault(tokenStore: SessionTokenStore): DwelloRepository {
-      val apiService = DwelloNetworkClient.createApiService(tokenStore = tokenStore)
-      return DwelloRepository(apiService = apiService, tokenStore = tokenStore)
+      val useFirebase = DwelloBackendConfig.isFirebaseApiActive()
+      val apiService = DwelloNetworkClient.createApiService(
+        tokenStore = tokenStore,
+        baseUrl = DwelloBackendConfig.activeApiBaseUrl()
+      )
+      return DwelloRepository(
+        apiService = apiService,
+        tokenStore = tokenStore,
+        firebaseSessionBridge = if (useFirebase) AndroidFirebaseSessionBridge() else null
+      )
     }
   }
 }

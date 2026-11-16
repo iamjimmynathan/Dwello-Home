@@ -31,6 +31,7 @@ data class RegisterRequest(
 data class RegisterResponse(
   val success: Boolean = false,
   val message: String? = null,
+  val custom_token: String? = null,
   val user: UserDto? = null
 )
 
@@ -45,6 +46,7 @@ data class LoginResponse(
   val success: Boolean = false,
   val message: String? = null,
   val token: String? = null,
+  val custom_token: String? = null,
   val expires_at: String? = null,
   val user: UserDto? = null
 )

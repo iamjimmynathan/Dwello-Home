@@ -1,0 +1,346 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDocExists(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    function isActiveUser(uid) {
+      return isSignedIn() && userDocExists(uid) && userDoc(uid).isActive == true;
+    }
+
+    function isAdmin() {
+      return isActiveUser(request.auth.uid) && userDoc(request.auth.uid).role == 'admin';
+    }
+
+    function isLandlord() {
+      return isActiveUser(request.auth.uid) && userDoc(request.auth.uid).role == 'landlord';
+    }
+
+    function isTenant() {
+      return isActiveUser(request.auth.uid) && userDoc(request.auth.uid).role == 'tenant';
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    // --- ENTITY VALIDATION HELPERS ---
+    function isValidUserProfile(data) {
+      return data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120 &&
+             data.phoneE164 is string && data.phoneE164.matches('^\\+234[789][0-9]{9}$') &&
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 160)) &&
+             data.role in ['tenant', 'landlord', 'admin'] &&
+             data.isActive is bool &&
+             data.phoneVerified is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidProperty(data) {
+      return !('landlordPhone' in data) &&
+             !('phone' in data) &&
+             !('phoneContact' in data) &&
+             data.landlordId is string && data.landlordId.size() >= 1 && data.landlordId.size() <= 128 &&
+             data.landlordName is string && data.landlordName.size() >= 2 && data.landlordName.size() <= 120 &&
+             data.title is string && data.title.size() >= 3 && data.title.size() <= 140 &&
+             data.propertyType in ['self_contained', 'mini_flat', '1_bedroom', '2_bedroom', '3_bedroom', 'duplex', 'detached_house', 'shared_room'] &&
+             data.bedrooms is int && data.bedrooms >= 1 && data.bedrooms <= 20 &&
+             data.bathrooms is int && data.bathrooms >= 1 && data.bathrooms <= 20 &&
+             data.rentAmount is int && data.rentAmount > 0 && data.rentAmount <= 500000000 &&
+             data.rentPeriod in ['monthly', 'yearly'] &&
+             data.description is string && data.description.size() >= 10 && data.description.size() <= 4000 &&
+             data.city is string && data.city.size() >= 2 && data.city.size() <= 80 &&
+             data.neighbourhood is string && data.neighbourhood.size() >= 2 && data.neighbourhood.size() <= 100 &&
+             data.fullAddress is string && data.fullAddress.size() >= 3 && data.fullAddress.size() <= 300 &&
+             (!('landmark' in data) || data.landmark == null || (data.landmark is string && data.landmark.size() <= 200)) &&
+             (!('facilities' in data) || (data.facilities is list && data.facilities.size() <= 12 && (data.facilities.size() == 0 || (data.facilities[0] is string && data.facilities[0].size() <= 60)))) &&
+             data.moderationStatus in ['pending_approval', 'approved', 'rejected'] &&
+             data.availabilityStatus in ['available', 'unavailable'] &&
+             (!('rejectionReason' in data) || data.rejectionReason == null || (data.rejectionReason is string && data.rejectionReason.size() <= 500)) &&
+             (!('moderatedBy' in data) || data.moderatedBy == null || (data.moderatedBy is string && data.moderatedBy.size() <= 128)) &&
+             (!('moderatedAt' in data) || data.moderatedAt == null || isValidTimestamp(data.moderatedAt)) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidPropertyImage(data) {
+      return data.propertyId is string && isValidId(data.propertyId) &&
+             data.landlordId is string && isValidId(data.landlordId) &&
+             data.moderationStatus in ['pending_approval', 'approved', 'rejected'] &&
+             data.storagePath is string && data.storagePath.size() >= 5 && data.storagePath.size() <= 500 &&
+             data.imageUrl is string && data.imageUrl.size() >= 5 && data.imageUrl.size() <= 1000 &&
+             (!('contentType' in data) || data.contentType == null || (data.contentType is string && data.contentType.size() <= 80)) &&
+             (!('sizeBytes' in data) || data.sizeBytes == null || (data.sizeBytes is int && data.sizeBytes > 0 && data.sizeBytes <= 10485760)) &&
+             data.sortOrder is int && data.sortOrder >= 0 && data.sortOrder <= 50 &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidEnquiry(data) {
+      return !('tenantPhone' in data) &&
+             !('landlordPhone' in data) &&
+             data.propertyId is string && isValidId(data.propertyId) &&
+             data.tenantId is string && isValidId(data.tenantId) &&
+             data.landlordId is string && isValidId(data.landlordId) &&
+             data.tenantName is string && data.tenantName.size() >= 2 && data.tenantName.size() <= 120 &&
+             data.propertyTitle is string && data.propertyTitle.size() >= 2 && data.propertyTitle.size() <= 140 &&
+             data.neighbourhood is string && data.neighbourhood.size() >= 2 && data.neighbourhood.size() <= 100 &&
+             data.rentAmount is int && data.rentAmount >= 0 && data.rentAmount <= 500000000 &&
+             (!('message' in data) || data.message == null || (data.message is string && data.message.size() <= 1500)) &&
+             (!('preferredInspectionDate' in data) || data.preferredInspectionDate == null || (data.preferredInspectionDate is string && data.preferredInspectionDate.size() <= 80)) &&
+             data.status in ['new', 'contacted', 'closed'] &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidFavourite(data) {
+      return data.userId is string && isValidId(data.userId) &&
+             data.propertyId is string && isValidId(data.propertyId) &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    // --- COLLECTIONS ---
+
+    // 1. Users (PII-isolated: owner or admin only; created via server auth API only)
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if false;
+      allow create: if false;
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().uid == existing().uid &&
+                       incoming().role == existing().role &&
+                       incoming().isActive == existing().isActive &&
+                       incoming().phoneE164 == existing().phoneE164 &&
+                       incoming().phoneVerified == existing().phoneVerified &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'email', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // 2. Server-only password hashes (never exposed to clients)
+    match /auth_credentials/{credentialId} {
+      allow read, write: if false;
+    }
+
+    // 3. Properties
+    match /properties/{propertyId} {
+      allow get: if isSignedIn() && isValidId(propertyId) && (
+        (existing().moderationStatus == 'approved' && existing().availabilityStatus == 'available') ||
+        existing().landlordId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // No get()/exists() inside allow list (cost-optimization & query enforcement)
+      allow list: if isSignedIn() && (
+        (existing().moderationStatus == 'approved' && existing().availabilityStatus == 'available') ||
+        existing().landlordId == request.auth.uid
+      );
+
+      allow create: if isSignedIn() &&
+                       isValidId(propertyId) &&
+                       isValidProperty(incoming()) &&
+                       incoming().keys().hasAll([
+                         'landlordId', 'landlordName', 'title', 'propertyType',
+                         'bedrooms', 'bathrooms', 'rentAmount', 'rentPeriod',
+                         'description', 'city', 'neighbourhood', 'fullAddress',
+                         'moderationStatus', 'availabilityStatus', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'landlordId', 'landlordName', 'title', 'propertyType',
+                         'bedrooms', 'bathrooms', 'rentAmount', 'rentPeriod',
+                         'description', 'city', 'neighbourhood', 'fullAddress',
+                         'landmark', 'facilities', 'moderationStatus', 'availabilityStatus',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().landlordId == request.auth.uid &&
+                       incoming().moderationStatus == 'pending_approval' &&
+                       incoming().availabilityStatus == 'available' &&
+                       isLandlord();
+
+      allow update: if isSignedIn() &&
+                       isValidId(propertyId) &&
+                       isValidProperty(incoming()) &&
+                       incoming().landlordId == existing().landlordId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         // Tier 1: Admin moderation (approve / reject)
+                         (isAdmin() &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'moderationStatus', 'rejectionReason', 'moderatedBy', 'moderatedAt', 'updatedAt'
+                          ])) ||
+                         // Tier 2a: Landlord edits property details -> resets to pending_approval
+                         (existing().landlordId == request.auth.uid &&
+                          isLandlord() &&
+                          incoming().moderationStatus == 'pending_approval' &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'title', 'propertyType', 'bedrooms', 'bathrooms', 'rentAmount', 'rentPeriod',
+                            'description', 'city', 'neighbourhood', 'fullAddress', 'landmark', 'facilities',
+                            'moderationStatus', 'updatedAt'
+                          ])) ||
+                         // Tier 2b: Landlord toggles availability on an approved listing
+                         (existing().landlordId == request.auth.uid &&
+                          isLandlord() &&
+                          existing().moderationStatus == 'approved' &&
+                          incoming().moderationStatus == existing().moderationStatus &&
+                          incoming().diff(existing()).affectedKeys().hasOnly([
+                            'availabilityStatus', 'updatedAt'
+                          ]))
+                       );
+
+      allow delete: if false;
+    }
+
+    // 4. Property Images
+    match /property_images/{imageId} {
+      allow get: if isSignedIn() && isValidId(imageId) && (
+        existing().moderationStatus == 'approved' ||
+        existing().landlordId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow list: if isSignedIn() && (
+        existing().moderationStatus == 'approved' ||
+        existing().landlordId == request.auth.uid
+      );
+
+      allow create: if isSignedIn() &&
+                       isValidId(imageId) &&
+                       isValidPropertyImage(incoming()) &&
+                       incoming().keys().hasAll([
+                         'propertyId', 'landlordId', 'moderationStatus',
+                         'storagePath', 'imageUrl', 'sortOrder', 'createdAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'propertyId', 'landlordId', 'moderationStatus',
+                         'storagePath', 'imageUrl', 'contentType', 'sizeBytes',
+                         'sortOrder', 'createdAt'
+                       ]) &&
+                       incoming().landlordId == request.auth.uid &&
+                       isLandlord() &&
+                       exists(/databases/$(database)/documents/properties/$(incoming().propertyId)) &&
+                       get(/databases/$(database)/documents/properties/$(incoming().propertyId)).data.landlordId == request.auth.uid &&
+                       incoming().moderationStatus == get(/databases/$(database)/documents/properties/$(incoming().propertyId)).data.moderationStatus;
+
+      allow update: if isSignedIn() &&
+                       isValidId(imageId) &&
+                       isValidPropertyImage(incoming()) &&
+                       isAdmin() &&
+                       incoming().propertyId == existing().propertyId &&
+                       incoming().landlordId == existing().landlordId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['moderationStatus', 'sortOrder']);
+
+      allow delete: if isSignedIn() && isValidId(imageId) && (
+        existing().landlordId == request.auth.uid || isAdmin()
+      );
+    }
+
+    // 5. Enquiries
+    match /enquiries/{enquiryId} {
+      allow get: if isSignedIn() && isValidId(enquiryId) && (
+        existing().tenantId == request.auth.uid ||
+        existing().landlordId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow list: if isSignedIn() && (
+        existing().tenantId == request.auth.uid ||
+        existing().landlordId == request.auth.uid
+      );
+
+      allow create: if isSignedIn() &&
+                       isValidId(enquiryId) &&
+                       isValidEnquiry(incoming()) &&
+                       incoming().keys().hasAll([
+                         'propertyId', 'tenantId', 'landlordId', 'tenantName',
+                         'propertyTitle', 'neighbourhood', 'rentAmount',
+                         'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'propertyId', 'tenantId', 'landlordId', 'tenantName',
+                         'propertyTitle', 'neighbourhood', 'rentAmount',
+                         'message', 'preferredInspectionDate', 'status',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().tenantId == request.auth.uid &&
+                       incoming().status == 'new' &&
+                       isTenant() &&
+                       exists(/databases/$(database)/documents/properties/$(incoming().propertyId)) &&
+                       get(/databases/$(database)/documents/properties/$(incoming().propertyId)).data.moderationStatus == 'approved' &&
+                       get(/databases/$(database)/documents/properties/$(incoming().propertyId)).data.availabilityStatus == 'available' &&
+                       incoming().landlordId == get(/databases/$(database)/documents/properties/$(incoming().propertyId)).data.landlordId;
+
+      allow update: if isSignedIn() &&
+                       isValidId(enquiryId) &&
+                       isValidEnquiry(incoming()) &&
+                       existing().landlordId == request.auth.uid &&
+                       existing().status != 'closed' &&
+                       incoming().tenantId == existing().tenantId &&
+                       incoming().landlordId == existing().landlordId &&
+                       incoming().propertyId == existing().propertyId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+                       isLandlord();
+
+      allow delete: if false;
+    }
+
+    // 6. Favourites
+    match /favourites/{favouriteId} {
+      allow get: if isSignedIn() && isValidId(favouriteId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(favouriteId) &&
+                       isValidFavourite(incoming()) &&
+                       incoming().keys().hasAll(['userId', 'propertyId', 'createdAt']) &&
+                       incoming().keys().hasOnly(['userId', 'propertyId', 'createdAt']) &&
+                       incoming().userId == request.auth.uid &&
+                       isTenant() &&
+                       exists(/databases/$(database)/documents/properties/$(incoming().propertyId)) &&
+                       get(/databases/$(database)/documents/properties/$(incoming().propertyId)).data.moderationStatus == 'approved' &&
+                       get(/databases/$(database)/documents/properties/$(incoming().propertyId)).data.availabilityStatus == 'available';
+
+      allow update: if false;
+
+      allow delete: if isSignedIn() && isValidId(favouriteId) && existing().userId == request.auth.uid;
+    }
+
+    // 7. Admin Audit Logs (Written exclusively by Admin SDK / Cloud Functions)
+    match /admin_logs/{logId} {
+      allow get: if isAdmin() && isValidId(logId);
+      allow list, create, update, delete: if false;
+    }
+  }
+}
