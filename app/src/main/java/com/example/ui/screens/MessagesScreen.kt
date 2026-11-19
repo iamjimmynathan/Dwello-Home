@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.AppLanguage
 import com.example.data.AuthAccountRole
 import com.example.data.DwelloStrings
+import com.example.data.DwelloSupportConfig
 import com.example.data.EnquiryItem
 import com.example.data.EnquiryStatus
 import com.example.ui.AsyncResourceState
@@ -332,16 +333,16 @@ fun MessagesScreen(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
               text = if (currentLanguage == AppLanguage.ENGLISH) {
-                "Need immediate help coordinating a viewing in Benin City? Call our toll-free desk."
+                "Need immediate help coordinating a viewing in Benin City? Call our support desk."
               } else {
-                "If you need urgent help to inspect house for Benin City, call our free line."
+                "If you need urgent help to inspect house for Benin City, call our support line."
               },
               style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
             )
             Spacer(modifier = Modifier.height(12.dp))
             Button(
               onClick = {
-                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:0800393556"))
+                val intent = Intent(Intent.ACTION_DIAL, Uri.parse(DwelloSupportConfig.SUPPORT_TEL_URI))
                 context.startActivity(intent)
               },
               colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
@@ -353,7 +354,7 @@ fun MessagesScreen(
             ) {
               Icon(Icons.Default.Call, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
               Spacer(modifier = Modifier.width(8.dp))
-              Text("Call Dwello Support (0800-393-556)", fontWeight = FontWeight.Bold)
+              Text("Call Dwello Support (${DwelloSupportConfig.SUPPORT_PHONE})", fontWeight = FontWeight.Bold)
             }
           }
         }

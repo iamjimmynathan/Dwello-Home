@@ -17,6 +17,7 @@ import com.example.data.AndroidKeystoreSessionTokenStore
 import com.example.data.DwelloRepository
 import com.example.data.InMemorySessionTokenStore
 import com.example.network.DwelloNetworkClient
+import com.example.network.DwelloNetworkConfig
 import com.example.ui.theme.MyApplicationTheme
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -73,8 +74,7 @@ class LoginFirstAccessRobolectricTest {
           200 to """
             {
               "success": true,
-              "token": "live-jwt-$role",
-              "expires_at": "2027-01-01T00:00:00Z",
+              "token": "tok-$role",
               "user": {
                 "id": "user_$role",
                 "full_name": "$name",
@@ -275,7 +275,7 @@ class LoginFirstAccessRobolectricTest {
 
     val apiService = DwelloNetworkClient.createApiService(
       tokenStore = tokenStore,
-      baseUrl = "https://dwellohomes-api.jimmynathan11.workers.dev/",
+      baseUrl = DwelloNetworkConfig.BASE_URL,
       extraInterceptors = listOf(interceptor)
     )
     return DwelloRepository(apiService, tokenStore)
@@ -339,7 +339,7 @@ class LoginFirstAccessRobolectricTest {
     waitForTag("home_screen_scroll")
     composeTestRule.onNodeWithTag("home_screen_scroll").assertIsDisplayed()
     composeTestRule.onNodeWithTag("bottom_nav_bar").assertIsDisplayed()
-    assertEquals("live-jwt-tenant", tokenStore.getSessionToken())
+    assertEquals("tok-tenant", tokenStore.getSessionToken())
 
     // Open Find Houses -> wait for live property load -> scroll to card -> toggle favourite -> view details
     composeTestRule.onNodeWithTag("nav_item_find_houses").performClick()
@@ -418,7 +418,7 @@ class LoginFirstAccessRobolectricTest {
     waitForTag("landlord_home_scroll")
     composeTestRule.onNodeWithTag("nav_item_find_houses").assertDoesNotExist()
     composeTestRule.onNodeWithTag("nav_item_my_properties").assertIsDisplayed()
-    assertEquals("live-jwt-landlord", tokenStore.getSessionToken())
+    assertEquals("tok-landlord", tokenStore.getSessionToken())
 
     // Navigate to My Properties tab (Landlord Dashboard)
     composeTestRule.onNodeWithTag("nav_item_my_properties").performClick()

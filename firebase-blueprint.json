@@ -1,0 +1,343 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Dwello Homes user profile (Tenant, Landlord, or Admin). Never stores password hashes or private credentials.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Authentication UID matching the document ID."
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Full display name of the user."
+        },
+        "phoneE164": {
+          "type": "string",
+          "description": "Normalized Nigerian mobile number in +234XXXXXXXXXX format."
+        },
+        "email": {
+          "type": "string",
+          "description": "Optional email address."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["tenant", "landlord", "admin"],
+          "description": "Account role enforced server-side. Public registration allows only tenant or landlord."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the account is active (false when suspended by an Admin)."
+        },
+        "phoneVerified": {
+          "type": "boolean",
+          "description": "Whether phone verification has been completed."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when user was created (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when profile was last updated (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": ["uid", "fullName", "phoneE164", "role", "isActive", "phoneVerified", "createdAt", "updatedAt"]
+    },
+    "AuthCredential": {
+      "title": "AuthCredential",
+      "description": "Server-only credential document storing scrypt password hashes for Nigerian phone + password sign-in. Client reads and writes are strictly denied.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID."
+        },
+        "phoneE164": {
+          "type": "string",
+          "description": "Normalized Nigerian phone number in +234XXXXXXXXXX format."
+        },
+        "passwordHash": {
+          "type": "string",
+          "description": "Scrypt password hash in salt:derivedKey hex format."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["tenant", "landlord", "admin"]
+        },
+        "failedAttempts": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "phoneE164", "passwordHash", "role", "createdAt", "updatedAt"]
+    },
+    "Property": {
+      "title": "Property",
+      "description": "Rental property listing in Benin City, Edo State. New listings always start in pending_approval. Never stores private landlord phone numbers.",
+      "type": "object",
+      "properties": {
+        "landlordId": {
+          "type": "string",
+          "description": "UID of the owning Landlord."
+        },
+        "landlordName": {
+          "type": "string",
+          "description": "Public display name of the landlord (never phone number)."
+        },
+        "title": {
+          "type": "string",
+          "description": "Property listing title."
+        },
+        "propertyType": {
+          "type": "string",
+          "enum": ["self_contained", "mini_flat", "1_bedroom", "2_bedroom", "3_bedroom", "duplex", "detached_house", "shared_room"]
+        },
+        "bedrooms": {
+          "type": "integer"
+        },
+        "bathrooms": {
+          "type": "integer"
+        },
+        "rentAmount": {
+          "type": "integer",
+          "description": "Rent amount in Nigerian Naira (NGN)."
+        },
+        "rentPeriod": {
+          "type": "string",
+          "enum": ["monthly", "yearly"]
+        },
+        "description": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string",
+          "description": "City (default Benin City)."
+        },
+        "neighbourhood": {
+          "type": "string"
+        },
+        "fullAddress": {
+          "type": "string"
+        },
+        "landmark": {
+          "type": "string"
+        },
+        "facilities": {
+          "type": "array",
+          "description": "Bounded list of up to 12 property facilities."
+        },
+        "moderationStatus": {
+          "type": "string",
+          "enum": ["pending_approval", "approved", "rejected"]
+        },
+        "availabilityStatus": {
+          "type": "string",
+          "enum": ["available", "unavailable"]
+        },
+        "rejectionReason": {
+          "type": "string"
+        },
+        "moderatedBy": {
+          "type": "string"
+        },
+        "moderatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["landlordId", "landlordName", "title", "propertyType", "bedrooms", "bathrooms", "rentAmount", "rentPeriod", "description", "city", "neighbourhood", "fullAddress", "moderationStatus", "availabilityStatus", "createdAt", "updatedAt"]
+    },
+    "PropertyImage": {
+      "title": "PropertyImage",
+      "description": "Metadata for property photographs stored in Firebase Storage.",
+      "type": "object",
+      "properties": {
+        "propertyId": {
+          "type": "string"
+        },
+        "landlordId": {
+          "type": "string"
+        },
+        "moderationStatus": {
+          "type": "string",
+          "enum": ["pending_approval", "approved", "rejected"]
+        },
+        "storagePath": {
+          "type": "string"
+        },
+        "imageUrl": {
+          "type": "string"
+        },
+        "contentType": {
+          "type": "string"
+        },
+        "sizeBytes": {
+          "type": "integer"
+        },
+        "sortOrder": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["propertyId", "landlordId", "moderationStatus", "storagePath", "imageUrl", "sortOrder", "createdAt"]
+    },
+    "Enquiry": {
+      "title": "Enquiry",
+      "description": "Tenant inspection enquiry on an approved, available property.",
+      "type": "object",
+      "properties": {
+        "propertyId": {
+          "type": "string"
+        },
+        "tenantId": {
+          "type": "string"
+        },
+        "landlordId": {
+          "type": "string"
+        },
+        "tenantName": {
+          "type": "string"
+        },
+        "propertyTitle": {
+          "type": "string"
+        },
+        "neighbourhood": {
+          "type": "string"
+        },
+        "rentAmount": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string"
+        },
+        "preferredInspectionDate": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["new", "contacted", "closed"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["propertyId", "tenantId", "landlordId", "tenantName", "propertyTitle", "neighbourhood", "rentAmount", "status", "createdAt", "updatedAt"]
+    },
+    "Favourite": {
+      "title": "Favourite",
+      "description": "Tenant saved property favourite.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "propertyId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "propertyId", "createdAt"]
+    },
+    "AdminLog": {
+      "title": "AdminLog",
+      "description": "Immutable server-written audit log of administrator moderation and user management actions.",
+      "type": "object",
+      "properties": {
+        "adminUid": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "targetType": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["adminUid", "action", "targetType", "targetId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "User profiles scoped to owner and admins (PII protected)."
+    },
+    "/auth_credentials/{credentialId}": {
+      "schema": {
+        "$ref": "#/entities/AuthCredential"
+      },
+      "description": "Server-only password hash credentials; client access completely blocked."
+    },
+    "/properties/{propertyId}": {
+      "schema": {
+        "$ref": "#/entities/Property"
+      },
+      "description": "Rental listings in Benin City with pending_approval -> approved/rejected workflow."
+    },
+    "/property_images/{imageId}": {
+      "schema": {
+        "$ref": "#/entities/PropertyImage"
+      },
+      "description": "Property photo metadata linked to Firebase Storage paths."
+    },
+    "/enquiries/{enquiryId}": {
+      "schema": {
+        "$ref": "#/entities/Enquiry"
+      },
+      "description": "Tenant inspection enquiries accessible only to the submitting tenant, property landlord, or admins."
+    },
+    "/favourites/{favouriteId}": {
+      "schema": {
+        "$ref": "#/entities/Favourite"
+      },
+      "description": "Tenant favourite bookmarks scoped strictly to userId."
+    },
+    "/admin_logs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/AdminLog"
+      },
+      "description": "Server-written administrator audit trail."
+    }
+  }
+}

@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performTextInput
 import com.example.data.DwelloRepository
 import com.example.data.InMemorySessionTokenStore
 import com.example.network.DwelloNetworkClient
+import com.example.network.DwelloNetworkConfig
 import com.example.ui.theme.MyApplicationTheme
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -64,8 +65,7 @@ class RoleBasedNavigationRobolectricTest {
           200 to """
             {
               "success": true,
-              "token": "jwt-$resolvedRole",
-              "expires_at": "2027-01-01T00:00:00Z",
+              "token": "tok-$resolvedRole",
               "user": {
                 "id": "usr_$resolvedRole",
                 "full_name": "$fullName",
@@ -150,7 +150,7 @@ class RoleBasedNavigationRobolectricTest {
 
     val apiService = DwelloNetworkClient.createApiService(
       tokenStore = tokenStore,
-      baseUrl = "https://dwellohomes-api.jimmynathan11.workers.dev/",
+      baseUrl = DwelloNetworkConfig.BASE_URL,
       extraInterceptors = listOf(interceptor)
     )
     return DwelloRepository(apiService, tokenStore)

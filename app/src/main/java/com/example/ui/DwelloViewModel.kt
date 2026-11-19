@@ -10,7 +10,10 @@ import com.example.data.DwelloRepository
 import com.example.data.EnquiryItem
 import com.example.data.EnquiryStatus
 import com.example.data.PropertyItem
+import com.example.data.PropertyPhotoRecord
+import com.example.data.PropertySubmissionResult
 import com.example.data.RentalPeriod
+import com.example.data.SelectedPhotoItem
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,14 +56,20 @@ data class DwelloUiState(
   // Landlord Dashboard & Management
   val landlordPropertiesState: AsyncResourceState<List<PropertyItem>> = AsyncResourceState.Idle,
   val landlordEnquiriesState: AsyncResourceState<List<EnquiryItem>> = AsyncResourceState.Idle,
+  val selectedLandlordPropertyDetailState: AsyncResourceState<PropertyItem>? = null,
   val landlordActionLoading: Boolean = false,
   val landlordActionMessage: String? = null,
   val landlordActionError: String? = null,
 
   // Landlord Post a House
   val postPropertyLoading: Boolean = false,
+  val postPropertyUploadProgress: String? = null,
   val postPropertyError: String? = null,
-  val postPropertySuccessId: String? = null
+  val postPropertySuccessId: String? = null,
+  val pendingUploadPropertyId: String? = null,
+  val pendingUploadPhotos: List<SelectedPhotoItem> = emptyList(),
+  val pendingUploadNextDisplayOrder: Int = 0,
+  val pendingUploadConfirmedImages: List<PropertyPhotoRecord> = emptyList()
 )
 
 class DwelloViewModel(
@@ -77,6 +86,9 @@ class DwelloViewModel(
     )
   )
   val uiState: StateFlow<DwelloUiState> = _uiState.asStateFlow()
+
+  // Holds only server-confirmed PropertyPhotoRecord items returned from POST /api/properties/{id}/images
+  private val confirmedServerImagesCache = mutableMapOf<String, List<PropertyPhotoRecord>>()
 
   init {
     if (repository.hasStoredSession()) {
@@ -103,6 +115,7 @@ class DwelloViewModel(
         }
         is DwelloApiResult.Error -> {
           repository.clearLocalSession()
+          confirmedServerImagesCache.clear()
           _uiState.update {
             it.copy(
               sessionStatus = SessionStatus.UNAUTHENTICATED,
@@ -168,6 +181,7 @@ class DwelloViewModel(
     _uiState.update { it.copy(authLoading = true) }
     viewModelScope.launch {
       repository.logout()
+      confirmedServerImagesCache.clear()
       _uiState.value = DwelloUiState(
         sessionStatus = SessionStatus.UNAUTHENTICATED,
         currentUser = null,
@@ -177,6 +191,7 @@ class DwelloViewModel(
   }
 
   private fun onAuthenticatedSuccess(user: AuthenticatedUser) {
+    confirmedServerImagesCache.clear()
     _uiState.value = DwelloUiState(
       sessionStatus = SessionStatus.AUTHENTICATED,
       currentUser = user,
@@ -195,6 +210,23 @@ class DwelloViewModel(
       state.currentUser?.role
     } else {
       null
+    }
+  }
+
+  private fun mergeConfirmedImages(item: PropertyItem): PropertyItem {
+    if (item.photoUris.isNotEmpty()) {
+      confirmedServerImagesCache[item.id] = item.serverImages
+      return item
+    }
+    val cached = confirmedServerImagesCache[item.id].orEmpty()
+    return if (cached.isNotEmpty()) {
+      val ordered = cached.sortedBy { it.displayOrder }
+      item.copy(
+        photoUris = ordered.map { it.imageUrl },
+        serverImages = ordered
+      )
+    } else {
+      item
     }
   }
 
@@ -282,7 +314,6 @@ class DwelloViewModel(
 
   fun openPropertyDetails(propertySummary: PropertyItem) {
     if (!com.example.data.RoleNavigationRouter.canAccessPropertyDetails(currentRole())) return
-    // Immediately open details with loading/summary, then fetch live full details + images from GET /api/properties/{id}
     _uiState.update {
       it.copy(selectedPropertyDetailState = AsyncResourceState.Loading)
     }
@@ -305,6 +336,38 @@ class DwelloViewModel(
 
   fun closePropertyDetails() {
     _uiState.update { it.copy(selectedPropertyDetailState = null) }
+  }
+
+  fun openLandlordPropertyDetails(propertySummary: PropertyItem) {
+    if (!com.example.data.RoleNavigationRouter.canAccessLandlordManagement(currentRole())) return
+    _uiState.update {
+      it.copy(selectedLandlordPropertyDetailState = AsyncResourceState.Loading)
+    }
+    viewModelScope.launch {
+      when (val result = repository.getPropertyDetails(propertySummary.id)) {
+        is DwelloApiResult.Success -> {
+          val resolved = mergeConfirmedImages(result.data)
+          _uiState.update {
+            it.copy(selectedLandlordPropertyDetailState = AsyncResourceState.Success(resolved))
+          }
+        }
+        is DwelloApiResult.Error -> {
+          if (handleUnauthorizedIfNeeded(result)) return@launch
+          // Pending/rejected listings may not always be returned by public detail endpoint; fall back cleanly
+          _uiState.update {
+            it.copy(
+              selectedLandlordPropertyDetailState = AsyncResourceState.Success(
+                mergeConfirmedImages(propertySummary)
+              )
+            )
+          }
+        }
+      }
+    }
+  }
+
+  fun closeLandlordPropertyDetails() {
+    _uiState.update { it.copy(selectedLandlordPropertyDetailState = null) }
   }
 
   fun loadTenantEnquiries() {
@@ -397,7 +460,9 @@ class DwelloViewModel(
       _uiState.update { state ->
         state.copy(
           landlordPropertiesState = when (propsResult) {
-            is DwelloApiResult.Success -> AsyncResourceState.Success(propsResult.data)
+            is DwelloApiResult.Success -> AsyncResourceState.Success(
+              propsResult.data.map { mergeConfirmedImages(it) }
+            )
             is DwelloApiResult.Error -> AsyncResourceState.Error(propsResult.message)
           },
           landlordEnquiriesState = when (enquiriesResult) {
@@ -435,20 +500,47 @@ class DwelloViewModel(
     description: String,
     neighbourhood: String,
     fullAddress: String,
-    landmark: String?
+    landmark: String?,
+    selectedPhotos: List<SelectedPhotoItem> = emptyList()
   ) {
     if (!com.example.data.RoleNavigationRouter.canAccessLandlordManagement(currentRole())) return
     if (_uiState.value.postPropertyLoading) return
+
+    val existingPropertyId = _uiState.value.pendingUploadPropertyId
+    val existingPendingPhotos = _uiState.value.pendingUploadPhotos
+    val existingNextOrder = _uiState.value.pendingUploadNextDisplayOrder
+    val existingConfirmed = _uiState.value.pendingUploadConfirmedImages
+
     _uiState.update {
       it.copy(
         postPropertyLoading = true,
+        postPropertyUploadProgress = if (existingPropertyId != null) {
+          "Retrying photo upload..."
+        } else {
+          "Saving property listing..."
+        },
         postPropertyError = null,
         postPropertySuccessId = null
       )
     }
+
     viewModelScope.launch {
-      when (
-        val result = repository.createProperty(
+      val result = if (existingPropertyId != null) {
+        val retryPhotos = existingPendingPhotos.ifEmpty { selectedPhotos }
+        repository.uploadRemainingPropertyImages(
+          propertyId = existingPropertyId,
+          photos = retryPhotos,
+          startDisplayOrder = existingNextOrder,
+          alreadyUploaded = existingConfirmed,
+          successMessage = "Property and photos submitted for Dwello Homes review.",
+          onUploadProgress = { idx, total ->
+            _uiState.update {
+              it.copy(postPropertyUploadProgress = "Uploading photo $idx of $total...")
+            }
+          }
+        )
+      } else {
+        repository.createPropertyWithImages(
           title = title,
           propertyTypeDisplay = propertyTypeDisplay,
           bedrooms = bedrooms,
@@ -458,24 +550,70 @@ class DwelloViewModel(
           description = description,
           neighbourhood = neighbourhood,
           fullAddress = fullAddress,
-          landmark = landmark
+          landmark = landmark,
+          photos = selectedPhotos,
+          onUploadProgress = { idx, total ->
+            _uiState.update {
+              it.copy(postPropertyUploadProgress = "Uploading photo $idx of $total...")
+            }
+          }
         )
-      ) {
-        is DwelloApiResult.Success -> {
+      }
+
+      when (result) {
+        is PropertySubmissionResult.Success -> {
+          if (result.uploadedImages.isNotEmpty()) {
+            confirmedServerImagesCache[result.propertyId] = result.uploadedImages
+          }
           _uiState.update {
             it.copy(
               postPropertyLoading = false,
+              postPropertyUploadProgress = null,
               postPropertyError = null,
-              postPropertySuccessId = result.data.ifBlank { "submitted" }
+              postPropertySuccessId = result.propertyId.ifBlank { "submitted" },
+              pendingUploadPropertyId = null,
+              pendingUploadPhotos = emptyList(),
+              pendingUploadNextDisplayOrder = 0,
+              pendingUploadConfirmedImages = emptyList()
             )
           }
           loadLandlordData()
         }
-        is DwelloApiResult.Error -> {
-          if (handleUnauthorizedIfNeeded(result)) return@launch
+        is PropertySubmissionResult.MetadataSavedUploadFailed -> {
+          if (result.isUnauthorized) {
+            handleUnauthorizedIfNeeded(
+              DwelloApiResult.Error(result.message, httpCode = 401, isUnauthorized = true)
+            )
+            return@launch
+          }
+          if (result.uploadedImages.isNotEmpty()) {
+            confirmedServerImagesCache[result.propertyId] = result.uploadedImages
+          }
           _uiState.update {
             it.copy(
               postPropertyLoading = false,
+              postPropertyUploadProgress = null,
+              postPropertyError = "Property saved (ID: ${result.propertyId}), but photo upload failed: ${result.message}",
+              postPropertySuccessId = null,
+              pendingUploadPropertyId = result.propertyId,
+              pendingUploadPhotos = result.remainingPhotos,
+              pendingUploadNextDisplayOrder = result.nextDisplayOrder,
+              pendingUploadConfirmedImages = result.uploadedImages
+            )
+          }
+          loadLandlordData()
+        }
+        is PropertySubmissionResult.Failure -> {
+          if (result.isUnauthorized) {
+            handleUnauthorizedIfNeeded(
+              DwelloApiResult.Error(result.message, httpCode = 401, isUnauthorized = true)
+            )
+            return@launch
+          }
+          _uiState.update {
+            it.copy(
+              postPropertyLoading = false,
+              postPropertyUploadProgress = null,
               postPropertyError = result.message,
               postPropertySuccessId = null
             )
@@ -489,8 +627,13 @@ class DwelloViewModel(
     _uiState.update {
       it.copy(
         postPropertyLoading = false,
+        postPropertyUploadProgress = null,
         postPropertyError = null,
-        postPropertySuccessId = null
+        postPropertySuccessId = null,
+        pendingUploadPropertyId = null,
+        pendingUploadPhotos = emptyList(),
+        pendingUploadNextDisplayOrder = 0,
+        pendingUploadConfirmedImages = emptyList()
       )
     }
   }
@@ -502,7 +645,10 @@ class DwelloViewModel(
     neighbourhood: String,
     description: String,
     fullAddress: String?,
-    landmark: String?
+    landmark: String?,
+    existingImages: List<PropertyPhotoRecord> = emptyList(),
+    imageIdsToDelete: List<String> = emptyList(),
+    newPhotosToUpload: List<SelectedPhotoItem> = emptyList()
   ) {
     if (!com.example.data.RoleNavigationRouter.canAccessLandlordManagement(currentRole())) return
     if (_uiState.value.landlordActionLoading) return
@@ -510,36 +656,84 @@ class DwelloViewModel(
       it.copy(landlordActionLoading = true, landlordActionError = null, landlordActionMessage = null)
     }
     viewModelScope.launch {
-      when (
-        val result = repository.updateProperty(
-          propertyId = propertyId,
-          title = title,
-          rentAmount = rentAmount,
-          neighbourhood = neighbourhood,
-          description = description,
-          fullAddress = fullAddress,
-          landmark = landmark
-        )
-      ) {
-        is DwelloApiResult.Success -> {
+      val updateResult = repository.updateProperty(
+        propertyId = propertyId,
+        title = title,
+        rentAmount = rentAmount,
+        neighbourhood = neighbourhood,
+        description = description,
+        fullAddress = fullAddress,
+        landmark = landmark
+      )
+
+      when (updateResult) {
+        is DwelloApiResult.Error -> {
+          if (handleUnauthorizedIfNeeded(updateResult)) return@launch
           _uiState.update {
             it.copy(
               landlordActionLoading = false,
-              landlordActionMessage = result.message ?: "Listing updated and sent for Dwello Homes approval."
+              landlordActionError = updateResult.message
             )
           }
-          loadLandlordData()
+          return@launch
         }
-        is DwelloApiResult.Error -> {
-          if (handleUnauthorizedIfNeeded(result)) return@launch
-          _uiState.update {
-            it.copy(
-              landlordActionLoading = false,
-              landlordActionError = result.message
-            )
+        is DwelloApiResult.Success -> Unit
+      }
+
+      val deleteIdSet = imageIdsToDelete.toSet()
+      val remainingImages = existingImages
+        .filter { record -> record.id == null || !deleteIdSet.contains(record.id) }
+        .toMutableList()
+
+      var photoOperationError: String? = null
+      for (imageId in imageIdsToDelete) {
+        when (val delRes = repository.deletePropertyImage(propertyId, imageId)) {
+          is DwelloApiResult.Success -> Unit
+          is DwelloApiResult.Error -> {
+            if (handleUnauthorizedIfNeeded(delRes)) return@launch
+            photoOperationError = "Listing details saved, but failed to remove an existing photo: ${delRes.message}"
+            break
           }
         }
       }
+
+      if (photoOperationError == null && newPhotosToUpload.isNotEmpty()) {
+        val nextOrder = (remainingImages.maxOfOrNull { it.displayOrder } ?: -1) + 1
+        when (
+          val uploadRes = repository.uploadPropertyImages(
+            propertyId = propertyId,
+            photos = newPhotosToUpload,
+            startDisplayOrder = nextOrder
+          )
+        ) {
+          is DwelloApiResult.Success -> {
+            remainingImages.addAll(uploadRes.data)
+          }
+          is DwelloApiResult.Error -> {
+            if (handleUnauthorizedIfNeeded(uploadRes)) return@launch
+            photoOperationError = "Listing details saved, but photo upload failed: ${uploadRes.message}"
+          }
+        }
+      }
+
+      if (remainingImages.isNotEmpty()) {
+        confirmedServerImagesCache[propertyId] = remainingImages.sortedBy { it.displayOrder }
+      } else if (imageIdsToDelete.isNotEmpty() && photoOperationError == null) {
+        confirmedServerImagesCache.remove(propertyId)
+      }
+
+      _uiState.update {
+        it.copy(
+          landlordActionLoading = false,
+          landlordActionMessage = if (photoOperationError == null) {
+            updateResult.message ?: "Listing updated and sent for Dwello Homes approval."
+          } else {
+            null
+          },
+          landlordActionError = photoOperationError
+        )
+      }
+      loadLandlordData()
     }
   }
 
@@ -623,6 +817,7 @@ class DwelloViewModel(
   private fun handleUnauthorizedIfNeeded(error: DwelloApiResult.Error): Boolean {
     if (error.isUnauthorized) {
       repository.clearLocalSession()
+      confirmedServerImagesCache.clear()
       _uiState.value = DwelloUiState(
         sessionStatus = SessionStatus.UNAUTHENTICATED,
         currentUser = null,

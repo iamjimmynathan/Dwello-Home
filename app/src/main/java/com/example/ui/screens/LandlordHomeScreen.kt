@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.AppLanguage
 import com.example.data.AuthenticatedUser
 import com.example.data.DwelloStrings
+import com.example.data.DwelloSupportConfig
 import com.example.data.EnquiryItem
 import com.example.data.PropertyItem
 import com.example.data.calculateLandlordStats
@@ -406,7 +407,7 @@ fun LandlordHomeScreen(
             ) {
               Button(
                 onClick = {
-                  val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:0800393556"))
+                  val intent = Intent(Intent.ACTION_DIAL, Uri.parse(DwelloSupportConfig.SUPPORT_TEL_URI))
                   context.startActivity(intent)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
@@ -414,6 +415,7 @@ fun LandlordHomeScreen(
                 modifier = Modifier
                   .weight(1f)
                   .height(48.dp)
+                  .testTag("landlord_call_support_button")
               ) {
                 Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
@@ -421,7 +423,7 @@ fun LandlordHomeScreen(
               }
               OutlinedButton(
                 onClick = {
-                  val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/234800393556"))
+                  val intent = Intent(Intent.ACTION_VIEW, Uri.parse(DwelloSupportConfig.SUPPORT_WHATSAPP_URI))
                   context.startActivity(intent)
                 },
                 border = BorderStroke(1.5.dp, SkyBluePrimary),
@@ -429,6 +431,7 @@ fun LandlordHomeScreen(
                 modifier = Modifier
                   .weight(1f)
                   .height(48.dp)
+                  .testTag("landlord_whatsapp_support_button")
               ) {
                 Icon(Icons.Default.Chat, contentDescription = null, tint = SkyBluePrimary, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))

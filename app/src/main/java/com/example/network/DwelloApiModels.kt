@@ -57,6 +57,17 @@ data class MeResponse(
 )
 
 @JsonClass(generateAdapter = true)
+data class PropertyImageDto(
+  val id: String? = null,
+  val property_id: String? = null,
+  val image_key: String? = null,
+  val image_url: String? = null,
+  val url: String? = null,
+  val display_order: Int? = null,
+  val created_at: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class PropertyDto(
   val id: String,
   val landlord_id: String? = null,
@@ -75,14 +86,31 @@ data class PropertyDto(
   val rejection_reason: String? = null,
   val created_at: String? = null,
   val updated_at: String? = null,
-  val landlord_name: String? = null
+  val landlord_name: String? = null,
+  val images: List<PropertyImageDto> = emptyList(),
+  val property_images: List<PropertyImageDto> = emptyList(),
+  val cover_image_url: String? = null,
+  val primary_image_url: String? = null,
+  val image_url: String? = null,
+  val thumbnail_url: String? = null,
+  val cover_image_key: String? = null,
+  val image_key: String? = null
 )
 
 @JsonClass(generateAdapter = true)
-data class PropertyImageDto(
+data class UploadPropertyImageResponse(
+  val success: Boolean = false,
+  val message: String? = null,
+  val error: String? = null,
   val id: String? = null,
+  val property_id: String? = null,
+  val image_key: String? = null,
   val image_url: String? = null,
-  val url: String? = null
+  val url: String? = null,
+  val display_order: Int? = null,
+  val created_at: String? = null,
+  val image: PropertyImageDto? = null,
+  val images: List<PropertyImageDto> = emptyList()
 )
 
 @JsonClass(generateAdapter = true)

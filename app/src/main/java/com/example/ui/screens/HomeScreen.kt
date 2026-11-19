@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -58,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -76,6 +79,7 @@ import coil.compose.AsyncImage
 import com.example.data.AppLanguage
 import com.example.data.AuthenticatedUser
 import com.example.data.DwelloStrings
+import com.example.data.DwelloSupportConfig
 import com.example.data.PropertyApprovalStatus
 import com.example.data.PropertyItem
 import com.example.data.RentalPeriod
@@ -583,7 +587,7 @@ fun HomeScreen(
               // Direct Call to Dwello Homes
               Button(
                 onClick = {
-                  val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:0800393556"))
+                  val intent = Intent(Intent.ACTION_DIAL, Uri.parse(DwelloSupportConfig.SUPPORT_TEL_URI))
                   context.startActivity(intent)
                 },
                 modifier = Modifier
@@ -725,7 +729,7 @@ fun HomeScreen(
           )
           Spacer(modifier = Modifier.height(12.dp))
           Text(
-            text = "Phone: +234 800 393 556\nBenin Hub: Ring Road Axis, Edo State",
+            text = "Phone: ${DwelloSupportConfig.SUPPORT_PHONE}\nBenin Hub: Ring Road Axis, Edo State",
             style = MaterialTheme.typography.bodySmall.copy(
               color = SkyBlueDark,
               fontWeight = FontWeight.SemiBold,
@@ -738,7 +742,7 @@ fun HomeScreen(
         Button(
           onClick = {
             showHelpDialog = false
-            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:0800393556"))
+            val intent = Intent(Intent.ACTION_DIAL, Uri.parse(DwelloSupportConfig.SUPPORT_TEL_URI))
             context.startActivity(intent)
           },
           colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
@@ -1309,6 +1313,10 @@ fun PropertyDetailDialog(
 
     is AsyncResourceState.Success -> {
       val property = detailState.data
+      var selectedPhotoIndex by remember(property.id, property.photoUris.size) { mutableIntStateOf(0) }
+      val remoteUrls = property.photoUris
+      val safeIndex = if (remoteUrls.isNotEmpty()) selectedPhotoIndex.coerceIn(remoteUrls.indices) else 0
+
       AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -1325,18 +1333,34 @@ fun PropertyDetailDialog(
               Box(
                 modifier = Modifier
                   .fillMaxWidth()
-                  .height(160.dp)
+                  .height(175.dp)
                   .clip(RoundedCornerShape(10.dp))
               ) {
-                if (property.photoUris.isNotEmpty()) {
+                if (remoteUrls.isNotEmpty()) {
                   AsyncImage(
-                    model = property.photoUris.first(),
+                    model = remoteUrls[safeIndex],
                     contentDescription = property.titleEn,
                     placeholder = painterResource(id = property.imageResId),
                     error = painterResource(id = property.imageResId),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                   )
+                  Surface(
+                    modifier = Modifier
+                      .padding(8.dp)
+                      .align(Alignment.BottomEnd),
+                    color = Color(0xCC000000),
+                    shape = RoundedCornerShape(10.dp)
+                  ) {
+                    Text(
+                      text = "${safeIndex + 1} / ${remoteUrls.size} Photos",
+                      modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                      style = MaterialTheme.typography.labelSmall.copy(
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                      )
+                    )
+                  }
                 } else {
                   Image(
                     painter = painterResource(id = property.imageResId),
@@ -1344,6 +1368,35 @@ fun PropertyDetailDialog(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                   )
+                }
+              }
+
+              if (remoteUrls.size > 1) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                  itemsIndexed(remoteUrls) { index, url ->
+                    val isSelected = safeIndex == index
+                    Card(
+                      modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { selectedPhotoIndex = index }
+                        .border(
+                          BorderStroke(2.dp, if (isSelected) SkyBluePrimary else SoftBlueBorder),
+                          RoundedCornerShape(8.dp)
+                        ),
+                      shape = RoundedCornerShape(8.dp)
+                    ) {
+                      AsyncImage(
+                        model = url,
+                        contentDescription = "Photo ${index + 1}",
+                        placeholder = painterResource(id = property.imageResId),
+                        error = painterResource(id = property.imageResId),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                      )
+                    }
+                  }
                 }
               }
 

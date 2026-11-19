@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.AppLanguage
 import com.example.data.AuthFormValidator
 import com.example.data.DwelloStrings
+import com.example.data.DwelloSupportConfig
 import com.example.data.ForgotPasswordValidationResult
 import com.example.ui.components.AuthTopBar
 import com.example.ui.components.NigerianPhoneInputField
@@ -214,9 +215,9 @@ fun ForgotPasswordScreen(
               Spacer(modifier = Modifier.height(4.dp))
               Text(
                 text = if (currentLanguage == AppLanguage.ENGLISH)
-                  "Self-service SMS OTP password reset is not yet enabled on the server. Please contact Dwello Homes Benin Support (0800-393-556) to verify your account and reset your password."
+                  "Self-service SMS OTP password reset is not yet enabled on the server. Please contact Dwello Homes Benin Support (${DwelloSupportConfig.SUPPORT_PHONE}) to verify your account and reset your password."
                 else
-                  "SMS OTP password reset never enable on server yet. Please call Dwello Homes Benin Support (0800-393-556) to verify your account and reset password.",
+                  "SMS OTP password reset never enable on server yet. Please call Dwello Homes Benin Support (${DwelloSupportConfig.SUPPORT_PHONE}) to verify your account and reset password.",
                 style = MaterialTheme.typography.bodySmall.copy(
                   color = DeepNavyText,
                   lineHeight = 19.sp

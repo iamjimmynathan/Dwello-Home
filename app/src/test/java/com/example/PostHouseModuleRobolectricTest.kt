@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultRegistry
@@ -19,24 +20,32 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.core.app.ActivityOptionsCompat
+import androidx.test.core.app.ApplicationProvider
+import coil.Coil
+import coil.ImageLoader
 import com.example.data.DwelloRepository
+import com.example.data.InMemoryPropertyImageDataSource
 import com.example.data.InMemorySessionTokenStore
 import com.example.network.DwelloNetworkClient
 import com.example.ui.theme.MyApplicationTheme
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
 @RunWith(RobolectricTestRunner::class)
@@ -45,6 +54,38 @@ class PostHouseModuleRobolectricTest {
 
   @get:Rule
   val composeTestRule = createComposeRule()
+
+  @Before
+  fun configureOfflineCoilLoader() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val tinyPng = byteArrayOf(
+      0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+      0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+      0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4.toByte(),
+      0x89.toByte(), 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41,
+      0x54, 0x78, 0x9C.toByte(), 0x63, 0x00, 0x01, 0x00, 0x00,
+      0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4.toByte(), 0x00,
+      0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE.toByte(),
+      0x42, 0x60, 0x82.toByte()
+    )
+    val offlineClient = OkHttpClient.Builder()
+      .addInterceptor { chain ->
+        Response.Builder()
+          .request(chain.request())
+          .protocol(Protocol.HTTP_1_1)
+          .code(200)
+          .message("OK")
+          .body(tinyPng.toResponseBody("image/png".toMediaType()))
+          .build()
+      }
+      .build()
+    Coil.setImageLoader(
+      ImageLoader.Builder(context)
+        .okHttpClient(offlineClient)
+        .build()
+    )
+  }
 
   private class FakeRegistryOwner : ActivityResultRegistryOwner {
     var nextMultiPickUris: List<Uri> = emptyList()
@@ -84,7 +125,7 @@ class PostHouseModuleRobolectricTest {
     val rejectionReason: String? = null,
     val createdAt: String = "2026-11-15T10:00:00Z"
   ) {
-    fun toJson(): String {
+    fun toJson(images: List<StoredImage> = emptyList()): String {
       val obj = JSONObject()
       obj.put("id", id)
       obj.put("title", title)
@@ -103,7 +144,30 @@ class PostHouseModuleRobolectricTest {
       if (rejectionReason != null) {
         obj.put("rejection_reason", rejectionReason)
       }
+      val imgArr = JSONArray()
+      images.sortedBy { it.displayOrder }.forEach { imgArr.put(it.toJson()) }
+      obj.put("images", imgArr)
       return obj.toString()
+    }
+  }
+
+  private data class StoredImage(
+    val id: String,
+    val propertyId: String,
+    val imageKey: String,
+    val imageUrl: String,
+    val displayOrder: Int,
+    val createdAt: String = "2026-11-15T11:31:00Z"
+  ) {
+    fun toJson(): JSONObject {
+      return JSONObject().apply {
+        put("id", id)
+        put("property_id", propertyId)
+        put("image_key", imageKey)
+        put("image_url", imageUrl)
+        put("display_order", displayOrder)
+        put("created_at", createdAt)
+      }
     }
   }
 
@@ -111,6 +175,7 @@ class PostHouseModuleRobolectricTest {
     var activeRole: String = "landlord"
   ) {
     val calledPaths = CopyOnWriteArrayList<String>()
+    val propertyImages = ConcurrentHashMap<String, CopyOnWriteArrayList<StoredImage>>()
     val listings = CopyOnWriteArrayList<StoredListing>(
       listOf(
         StoredListing(
@@ -165,6 +230,7 @@ class PostHouseModuleRobolectricTest {
       )
     )
     var createdCounter = 1
+    var imageCounter = 1
   }
 
   private fun createRepository(
@@ -179,6 +245,10 @@ class PostHouseModuleRobolectricTest {
       req.body?.writeTo(buf)
       val bodyText = buf.readUtf8()
       server.calledPaths.add("$method $path")
+
+      val uploadImageMatch = Regex("^/api/properties/([^/]+)/images$").matchEntire(path)
+      val deleteImageMatch = Regex("^/api/properties/([^/]+)/images/([^/]+)$").matchEntire(path)
+      val propertyByIdMatch = Regex("^/api/properties/([^/]+)$").matchEntire(path)
 
       val (code, json) = when {
         method == "GET" && path == "/api/auth/me" -> {
@@ -226,8 +296,61 @@ class PostHouseModuleRobolectricTest {
           """.trimIndent()
         }
 
+        method == "POST" && uploadImageMatch != null -> {
+          val propId = uploadImageMatch.groupValues[1]
+          val imgNum = server.imageCounter++
+          val list = server.propertyImages.getOrPut(propId) { CopyOnWriteArrayList() }
+          val orderMatch = Regex("name=\"display_order\"\\s*\\r?\\n\\r?\\n(\\d+)").find(bodyText)
+          val displayOrder = orderMatch?.groupValues?.get(1)?.toIntOrNull() ?: list.size
+          val key = "properties/$propId/photo_$imgNum.jpg"
+          val url = "/api/images/properties%2F$propId%2Fphoto_$imgNum.jpg"
+          val storedImg = StoredImage(
+            id = "img_$imgNum",
+            propertyId = propId,
+            imageKey = key,
+            imageUrl = url,
+            displayOrder = displayOrder
+          )
+          list.add(storedImg)
+          201 to JSONObject().apply {
+            put("success", true)
+            put("message", "Property image uploaded")
+            put("image", storedImg.toJson())
+          }.toString()
+        }
+
+        method == "DELETE" && deleteImageMatch != null -> {
+          val propId = deleteImageMatch.groupValues[1]
+          val imgId = deleteImageMatch.groupValues[2]
+          server.propertyImages[propId]?.removeIf { it.id == imgId }
+          200 to """{"success": true, "message": "Image removed"}"""
+        }
+
+        method == "PATCH" && propertyByIdMatch != null -> {
+          val propId = propertyByIdMatch.groupValues[1]
+          val reqJson = JSONObject(bodyText)
+          val idx = server.listings.indexOfFirst { it.id == propId }
+          if (idx >= 0) {
+            val cur = server.listings[idx]
+            server.listings[idx] = cur.copy(
+              title = reqJson.optString("title", cur.title),
+              rentAmount = if (reqJson.has("rent_amount")) reqJson.getLong("rent_amount") else cur.rentAmount,
+              neighbourhood = reqJson.optString("neighbourhood", cur.neighbourhood),
+              description = reqJson.optString("description", cur.description),
+              fullAddress = reqJson.optString("full_address", cur.fullAddress),
+              landmark = reqJson.optString("landmark", cur.landmark),
+              moderationStatus = "pending_approval"
+            )
+            200 to """{"success": true, "message": "Listing updated", "moderation_status": "pending_approval"}"""
+          } else {
+            404 to """{"error": "Property not found"}"""
+          }
+        }
+
         method == "GET" && path == "/api/landlord/properties" -> {
-          val arrayJson = server.listings.joinToString(",") { it.toJson() }
+          val arrayJson = server.listings.joinToString(",") { prop ->
+            prop.toJson(server.propertyImages[prop.id].orEmpty())
+          }
           200 to """{"success": true, "properties": [$arrayJson]}"""
         }
 
@@ -236,17 +359,25 @@ class PostHouseModuleRobolectricTest {
         }
 
         method == "GET" && path == "/api/properties" -> {
-          // Server returns all properties; both server & client enforce approved+available
           val approvedOnly = server.listings.filter {
             it.moderationStatus == "approved" && it.availabilityStatus == "available"
           }
-          val arrayJson = approvedOnly.joinToString(",") { it.toJson() }
+          val arrayJson = approvedOnly.joinToString(",") { prop ->
+            prop.toJson(server.propertyImages[prop.id].orEmpty())
+          }
           200 to """{"success": true, "properties": [$arrayJson]}"""
         }
 
-        method == "GET" && path == "/api/properties/prop_approved_1" -> {
-          val prop = server.listings.first { it.id == "prop_approved_1" }
-          200 to """{"success": true, "property": ${prop.toJson()}, "images": []}"""
+        method == "GET" && propertyByIdMatch != null -> {
+          val propId = propertyByIdMatch.groupValues[1]
+          val prop = server.listings.firstOrNull { it.id == propId }
+          if (prop == null) {
+            404 to """{"error": "Property not found"}"""
+          } else {
+            val imgs = server.propertyImages[propId].orEmpty().sortedBy { it.displayOrder }
+            val imgArr = JSONArray().apply { imgs.forEach { put(it.toJson()) } }
+            200 to """{"success": true, "property": ${prop.toJson(imgs)}, "images": $imgArr}"""
+          }
         }
 
         method == "GET" && path == "/api/favourites" -> {
@@ -274,7 +405,13 @@ class PostHouseModuleRobolectricTest {
       baseUrl = "https://dwellohomes-api.jimmynathan11.workers.dev/",
       extraInterceptors = listOf(interceptor)
     )
-    return DwelloRepository(apiService, tokenStore)
+    return DwelloRepository(
+      apiService = apiService,
+      tokenStore = tokenStore,
+      imageDataSource = InMemoryPropertyImageDataSource(
+        fallbackSampleBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte())
+      )
+    )
   }
 
   private fun waitForTag(tag: String) {
@@ -422,7 +559,7 @@ class PostHouseModuleRobolectricTest {
     waitForTag("post_house_step_5")
     composeTestRule.onNodeWithText("Verified 2 Bedroom Flat in Ugbowo").performScrollTo().assertIsDisplayed()
 
-    // Scenario 4: Submit for Approval -> creates PENDING_APPROVAL listing via POST /api/properties
+    // Scenario 4: Submit for Approval -> creates PENDING_APPROVAL listing via POST /api/properties AND uploads 2 images
     composeTestRule.onNodeWithTag("submit_property_button").performScrollTo().performClick()
     waitForTag("view_in_dashboard_button")
     assertTrue(server.calledPaths.contains("POST /api/properties"))
@@ -430,6 +567,9 @@ class PostHouseModuleRobolectricTest {
     val created = server.listings.first { it.title == "Verified 2 Bedroom Flat in Ugbowo" }
     assertEquals("pending_approval", created.moderationStatus)
     assertEquals("2_bedroom", created.propertyType)
+    assertEquals(2, server.calledPaths.count { it == "POST /api/properties/${created.id}/images" })
+    assertEquals(2, server.propertyImages[created.id]?.size ?: 0)
+    assertEquals(listOf(0, 1), server.propertyImages[created.id]?.map { it.displayOrder })
 
     composeTestRule.onNodeWithTag("view_in_dashboard_button").performClick()
     waitForTag("landlord_dashboard_scroll")
@@ -437,12 +577,42 @@ class PostHouseModuleRobolectricTest {
       composeTestRule.onAllNodesWithTag("landlord_properties_loading").fetchSemanticsNodes().isEmpty()
     }
 
-    // Verify new Pending Approval listing shows in My Properties with Edit Pending Listing & View Details (and NO Mark Unavailable button)
+    // Verify new Pending Approval listing shows in My Properties with uploaded multi-photo badge & details gallery
     composeTestRule.onNodeWithTag("landlord_dashboard_scroll")
       .performScrollToNode(hasTestTag("landlord_property_card_${created.id}"))
     composeTestRule.onNodeWithText("Verified 2 Bedroom Flat in Ugbowo").performScrollTo().assertIsDisplayed()
+    composeTestRule.onNodeWithTag("landlord_card_photo_count_${created.id}").performScrollTo().assertIsDisplayed()
     composeTestRule.onNodeWithTag("landlord_property_submitted_date_${created.id}").performScrollTo().assertIsDisplayed()
     composeTestRule.onNodeWithTag("toggle_availability_button_${created.id}").assertDoesNotExist()
+
+    // Open Property Details -> verify multi-image gallery (1 / 2 Photos -> click thumbnail 1 -> 2 / 2 Photos)
+    composeTestRule.onNodeWithTag("view_landlord_details_button_${created.id}").performScrollTo().performClick()
+    waitForTag("landlord_details_photo_counter")
+    composeTestRule.onNodeWithText("1 / 2 Photos").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("landlord_details_thumbnail_1").performClick()
+    composeTestRule.waitForIdle()
+    composeTestRule.onNodeWithText("2 / 2 Photos").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Close").performClick()
+
+    // Open Edit Property -> add 1 new photo -> Save & Submit -> verify all 3 photos persist on server & UI
+    composeTestRule.onNodeWithTag("edit_listing_button_${created.id}").performScrollTo().performClick()
+    waitForTag("edit_property_dialog")
+    waitForTag("edit_existing_photos_row")
+    registryOwner.nextMultiPickUris = listOf(Uri.parse("file:///tmp/extra_bedroom.jpg"))
+    composeTestRule.onNodeWithTag("edit_add_photos_button").performScrollTo().performClick()
+    waitForTag("edit_new_photos_row")
+    composeTestRule.onNodeWithTag("save_listing_changes_button").performClick()
+
+    composeTestRule.waitUntil(timeoutMillis = 10_000) {
+      composeTestRule.onAllNodesWithText("Status Updated").fetchSemanticsNodes().isNotEmpty() &&
+        server.propertyImages[created.id]?.size == 3
+    }
+    assertEquals(3, server.propertyImages[created.id]?.size ?: 0)
+    assertEquals(listOf(0, 1, 2), server.propertyImages[created.id]?.map { it.displayOrder })
+    composeTestRule.onNodeWithText("OK").performClick()
+    composeTestRule.waitUntil(timeoutMillis = 5_000) {
+      composeTestRule.onAllNodesWithText("3 photos").fetchSemanticsNodes().isNotEmpty()
+    }
   }
 
   @Test

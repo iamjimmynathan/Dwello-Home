@@ -113,6 +113,8 @@ fun PostHouseScreen(
   isSubmitting: Boolean,
   submitError: String?,
   submittedPropertyId: String?,
+  uploadProgressMessage: String? = null,
+  pendingUploadPropertyId: String? = null,
   onLanguageToggle: () -> Unit,
   onSubmitProperty: (
     title: String,
@@ -124,7 +126,8 @@ fun PostHouseScreen(
     description: String,
     neighbourhood: String,
     fullAddress: String,
-    landmark: String?
+    landmark: String?,
+    selectedPhotos: List<SelectedPhotoItem>
   ) -> Unit,
   onResetSubmitState: () -> Unit,
   onSuccessNavigateHome: () -> Unit,
@@ -378,7 +381,8 @@ fun PostHouseScreen(
       fullDescription,
       selectedNeighbourhood,
       composedFullAddress,
-      cleanStreet
+      cleanStreet,
+      selectedPhotos.toList()
     )
   }
 
@@ -1752,14 +1756,22 @@ fun PostHouseScreen(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                  text = if (currentLanguage == AppLanguage.ENGLISH) "Submitting..." else "Dey Submit...",
+                  text = uploadProgressMessage ?: if (currentLanguage == AppLanguage.ENGLISH) {
+                    "Submitting..."
+                  } else {
+                    "Dey Submit..."
+                  },
                   style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                 )
               } else {
                 Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                  text = DwelloStrings.submitForApprovalBtn(currentLanguage),
+                  text = if (!pendingUploadPropertyId.isNullOrBlank()) {
+                    DwelloStrings.retryPhotoUploadBtn(currentLanguage)
+                  } else {
+                    DwelloStrings.submitForApprovalBtn(currentLanguage)
+                  },
                   style = MaterialTheme.typography.titleSmall.copy(
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 15.sp

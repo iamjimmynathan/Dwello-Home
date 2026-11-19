@@ -1,8 +1,13 @@
 package com.example.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,19 +24,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mail
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
@@ -55,6 +64,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,6 +74,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -77,7 +89,10 @@ import com.example.data.EnquiryItem
 import com.example.data.EnquiryStatus
 import com.example.data.PropertyApprovalStatus
 import com.example.data.PropertyItem
+import com.example.data.PropertyPhotoRecord
+import com.example.data.PropertyPhotoValidator
 import com.example.data.RentalPeriod
+import com.example.data.SelectedPhotoItem
 import com.example.data.calculateLandlordStats
 import com.example.ui.AsyncResourceState
 import com.example.ui.components.DwelloHeader
@@ -106,12 +121,15 @@ fun LandlordDashboardScreen(
   currentUser: AuthenticatedUser?,
   propertiesState: AsyncResourceState<List<PropertyItem>>,
   enquiriesState: AsyncResourceState<List<EnquiryItem>>,
+  selectedPropertyDetailState: AsyncResourceState<PropertyItem>? = null,
   isActionLoading: Boolean,
   actionMessage: String?,
   actionError: String?,
   onLanguageToggle: () -> Unit,
   onRetryLoad: () -> Unit,
   onNavigateToPostHouse: () -> Unit,
+  onOpenPropertyDetails: (PropertyItem) -> Unit = {},
+  onClosePropertyDetails: () -> Unit = {},
   onUpdateListing: (
     propertyId: String,
     title: String,
@@ -119,7 +137,10 @@ fun LandlordDashboardScreen(
     neighbourhood: String,
     description: String,
     fullAddress: String?,
-    landmark: String?
+    landmark: String?,
+    existingImages: List<PropertyPhotoRecord>,
+    imageIdsToDelete: List<String>,
+    newPhotosToUpload: List<SelectedPhotoItem>
   ) -> Unit,
   onToggleAvailability: (PropertyItem) -> Unit,
   onUpdateEnquiryStatus: (enquiryId: String, status: EnquiryStatus) -> Unit,
@@ -595,7 +616,10 @@ fun LandlordDashboardScreen(
                 property = property,
                 currentLanguage = currentLanguage,
                 isActionLoading = isActionLoading,
-                onViewDetailsClick = { propertyToViewDetails = property },
+                onViewDetailsClick = {
+                  onOpenPropertyDetails(property)
+                  propertyToViewDetails = property
+                },
                 onEditClick = { propertyToEdit = property },
                 onToggleAvailability = { onToggleAvailability(property) },
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -646,27 +670,33 @@ fun LandlordDashboardScreen(
     }
   }
 
-  // Property Details Dialog (shows full info, photos, submission date, and rejection reason)
-  propertyToViewDetails?.let { prop ->
+  // Property Details Dialog (hydrated via GET /api/properties/{id} when available, with gallery support)
+  val effectiveDetailState: AsyncResourceState<PropertyItem>? =
+    selectedPropertyDetailState ?: propertyToViewDetails?.let { AsyncResourceState.Success(it) }
+  if (effectiveDetailState != null) {
     LandlordPropertyDetailsDialog(
-      property = prop,
+      detailState = effectiveDetailState,
       currentLanguage = currentLanguage,
-      onEditClick = {
+      onEditClick = { resolvedProp ->
         propertyToViewDetails = null
-        propertyToEdit = prop
+        onClosePropertyDetails()
+        propertyToEdit = resolvedProp
       },
-      onDismiss = { propertyToViewDetails = null }
+      onDismiss = {
+        propertyToViewDetails = null
+        onClosePropertyDetails()
+      }
     )
   }
 
-  // Edit Listing Dialog (PATCH /api/properties/{id})
+  // Edit Listing Dialog (PATCH /api/properties/{id} + add/delete R2 images)
   propertyToEdit?.let { prop ->
     EditPropertyDialog(
       property = prop,
       currentLanguage = currentLanguage,
       isSaving = isActionLoading,
       onDismiss = { propertyToEdit = null },
-      onSave = { updatedTitle, updatedPrice, updatedArea, updatedDesc, updatedAddress, updatedLandmark ->
+      onSave = { updatedTitle, updatedPrice, updatedArea, updatedDesc, updatedAddress, updatedLandmark, existingImages, imageIdsToDelete, newPhotosToUpload ->
         onUpdateListing(
           prop.id,
           updatedTitle,
@@ -674,7 +704,10 @@ fun LandlordDashboardScreen(
           updatedArea,
           updatedDesc,
           updatedAddress,
-          updatedLandmark
+          updatedLandmark,
+          existingImages,
+          imageIdsToDelete,
+          newPhotosToUpload
         )
         propertyToEdit = null
       }
@@ -906,6 +939,38 @@ fun LandlordPropertyCard(
                 fontSize = 11.sp
               )
             )
+          }
+        }
+
+        if (property.photoUris.size > 1) {
+          Surface(
+            modifier = Modifier
+              .padding(10.dp)
+              .align(Alignment.BottomStart)
+              .testTag("landlord_card_photo_count_${property.id}"),
+            color = Color(0xCC000000),
+            shape = RoundedCornerShape(8.dp)
+          ) {
+            Row(
+              modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(
+                imageVector = Icons.Default.PhotoLibrary,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(13.dp)
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text(
+                text = "${property.photoUris.size} photos",
+                style = MaterialTheme.typography.labelSmall.copy(
+                  color = Color.White,
+                  fontWeight = FontWeight.Bold,
+                  fontSize = 11.sp
+                )
+              )
+            }
           }
         }
       }
@@ -1212,142 +1277,259 @@ fun LandlordPropertyCard(
 
 @Composable
 fun LandlordPropertyDetailsDialog(
-  property: PropertyItem,
+  detailState: AsyncResourceState<PropertyItem>,
   currentLanguage: AppLanguage,
-  onEditClick: () -> Unit,
+  onEditClick: (PropertyItem) -> Unit,
   onDismiss: () -> Unit
 ) {
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    modifier = Modifier.testTag("landlord_property_details_dialog"),
-    title = {
-      Text(
-        text = property.titleEn,
-        fontWeight = FontWeight.ExtraBold,
-        color = DeepNavyText,
-        fontSize = 18.sp
-      )
-    },
-    text = {
-      LazyColumn(modifier = Modifier.fillMaxWidth()) {
-        item {
-          Box(
+  when (detailState) {
+    is AsyncResourceState.Idle,
+    is AsyncResourceState.Loading -> {
+      AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("landlord_property_details_dialog"),
+        title = {
+          Text(
+            text = if (currentLanguage == AppLanguage.ENGLISH) "Loading Property" else "Dey Load House",
+            fontWeight = FontWeight.ExtraBold,
+            color = DeepNavyText,
+            fontSize = 18.sp
+          )
+        },
+        text = {
+          Row(
             modifier = Modifier
               .fillMaxWidth()
-              .height(150.dp)
-              .clip(RoundedCornerShape(12.dp))
+              .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
           ) {
-            if (property.photoUris.isNotEmpty()) {
-              AsyncImage(
-                model = property.photoUris.first(),
-                contentDescription = property.titleEn,
-                placeholder = painterResource(id = property.imageResId),
-                error = painterResource(id = property.imageResId),
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-              )
-            } else {
-              Image(
-                painter = painterResource(id = property.imageResId),
-                contentDescription = property.titleEn,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-              )
-            }
+            CircularProgressIndicator(color = SkyBluePrimary, modifier = Modifier.size(28.dp))
+            Spacer(modifier = Modifier.width(12.dp))
+            Text("Loading property photos & details...", color = NavyTextSecondary)
           }
-          Spacer(modifier = Modifier.height(12.dp))
+        },
+        confirmButton = {
+          TextButton(onClick = onDismiss) {
+            Text("Close", color = SkyBluePrimary)
+          }
+        }
+      )
+    }
 
-          val periodText = if (property.rentalPeriod == RentalPeriod.MONTHLY) "/ month" else "/ year"
+    is AsyncResourceState.Error -> {
+      AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("landlord_property_details_dialog"),
+        title = {
           Text(
-            text = "${property.priceFormatted} $periodText",
-            style = MaterialTheme.typography.titleMedium.copy(
-              fontWeight = FontWeight.ExtraBold,
-              color = SkyBluePrimary
-            )
+            text = "Unable to Load Property",
+            fontWeight = FontWeight.ExtraBold,
+            color = DeepNavyText,
+            fontSize = 18.sp
           )
-          Spacer(modifier = Modifier.height(4.dp))
-          Text(
-            text = "${property.categoryEn} • ${property.bedrooms} Bed • ${property.bathrooms} Bath",
-            style = MaterialTheme.typography.bodySmall.copy(
-              fontWeight = FontWeight.SemiBold,
-              color = DeepNavyText
-            )
-          )
-          Spacer(modifier = Modifier.height(4.dp))
-          Text(
-            text = "${property.area}, Benin City • ${property.fullAddress.ifBlank { property.neighborhoodNote }}",
-            style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
-          )
-          Spacer(modifier = Modifier.height(4.dp))
-          Text(
-            text = "${DwelloStrings.submittedDatePrefix(currentLanguage)}: ${property.createdAtDisplay.ifBlank { "Submitted" }}",
-            style = MaterialTheme.typography.labelSmall.copy(
-              color = NavyTextSecondary,
-              fontWeight = FontWeight.Bold
-            )
-          )
+        },
+        text = { Text(detailState.message, color = Color(0xFF991B1B)) },
+        confirmButton = {
+          TextButton(onClick = onDismiss) {
+            Text("Close", color = SkyBluePrimary)
+          }
+        }
+      )
+    }
 
-          if (property.approvalStatus == PropertyApprovalStatus.REJECTED) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Surface(
-              color = Color(0xFFFEF2F2),
-              shape = RoundedCornerShape(10.dp),
-              border = BorderStroke(1.dp, Color(0xFFFECACA)),
-              modifier = Modifier.fillMaxWidth()
-            ) {
-              Column(modifier = Modifier.padding(10.dp)) {
-                Text(
-                  text = DwelloStrings.rejectionReasonTitle(currentLanguage),
-                  style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF991B1B)
+    is AsyncResourceState.Success -> {
+      val property = detailState.data
+      var selectedPhotoIndex by remember(property.id, property.photoUris.size) { mutableIntStateOf(0) }
+      val remoteUrls = property.photoUris
+      val safeIndex = if (remoteUrls.isNotEmpty()) selectedPhotoIndex.coerceIn(remoteUrls.indices) else 0
+
+      AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("landlord_property_details_dialog"),
+        title = {
+          Text(
+            text = property.titleEn,
+            fontWeight = FontWeight.ExtraBold,
+            color = DeepNavyText,
+            fontSize = 18.sp
+          )
+        },
+        text = {
+          LazyColumn(modifier = Modifier.fillMaxWidth()) {
+            item {
+              Box(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .height(175.dp)
+                  .clip(RoundedCornerShape(12.dp))
+              ) {
+                if (remoteUrls.isNotEmpty()) {
+                  AsyncImage(
+                    model = remoteUrls[safeIndex],
+                    contentDescription = property.titleEn,
+                    placeholder = painterResource(id = property.imageResId),
+                    error = painterResource(id = property.imageResId),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                   )
+                  Surface(
+                    modifier = Modifier
+                      .padding(8.dp)
+                      .align(Alignment.BottomEnd)
+                      .testTag("landlord_details_photo_counter"),
+                    color = Color(0xCC000000),
+                    shape = RoundedCornerShape(10.dp)
+                  ) {
+                    Text(
+                      text = "${safeIndex + 1} / ${remoteUrls.size} Photos",
+                      modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                      style = MaterialTheme.typography.labelSmall.copy(
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                      )
+                    )
+                  }
+                } else {
+                  Image(
+                    painter = painterResource(id = property.imageResId),
+                    contentDescription = property.titleEn,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                  )
+                }
+              }
+
+              if (remoteUrls.size > 1) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(
+                  horizontalArrangement = Arrangement.spacedBy(8.dp),
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("landlord_details_thumbnails_row")
+                ) {
+                  itemsIndexed(remoteUrls) { index, url ->
+                    val isSelected = safeIndex == index
+                    Card(
+                      modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { selectedPhotoIndex = index }
+                        .border(
+                          BorderStroke(2.dp, if (isSelected) SkyBluePrimary else SoftBlueBorder),
+                          RoundedCornerShape(8.dp)
+                        )
+                        .testTag("landlord_details_thumbnail_$index"),
+                      shape = RoundedCornerShape(8.dp)
+                    ) {
+                      AsyncImage(
+                        model = url,
+                        contentDescription = "Property Photo ${index + 1}",
+                        placeholder = painterResource(id = property.imageResId),
+                        error = painterResource(id = property.imageResId),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                      )
+                    }
+                  }
+                }
+              }
+
+              Spacer(modifier = Modifier.height(12.dp))
+
+              val periodText = if (property.rentalPeriod == RentalPeriod.MONTHLY) "/ month" else "/ year"
+              Text(
+                text = "${property.priceFormatted} $periodText",
+                style = MaterialTheme.typography.titleMedium.copy(
+                  fontWeight = FontWeight.ExtraBold,
+                  color = SkyBluePrimary
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+              )
+              Spacer(modifier = Modifier.height(4.dp))
+              Text(
+                text = "${property.categoryEn} • ${property.bedrooms} Bed • ${property.bathrooms} Bath",
+                style = MaterialTheme.typography.bodySmall.copy(
+                  fontWeight = FontWeight.SemiBold,
+                  color = DeepNavyText
+                )
+              )
+              Spacer(modifier = Modifier.height(4.dp))
+              Text(
+                text = "${property.area}, Benin City • ${property.fullAddress.ifBlank { property.neighborhoodNote }}",
+                style = MaterialTheme.typography.bodySmall.copy(color = NavyTextSecondary)
+              )
+              Spacer(modifier = Modifier.height(4.dp))
+              Text(
+                text = "${DwelloStrings.submittedDatePrefix(currentLanguage)}: ${property.createdAtDisplay.ifBlank { "Submitted" }}",
+                style = MaterialTheme.typography.labelSmall.copy(
+                  color = NavyTextSecondary,
+                  fontWeight = FontWeight.Bold
+                )
+              )
+
+              if (property.approvalStatus == PropertyApprovalStatus.REJECTED) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                  color = Color(0xFFFEF2F2),
+                  shape = RoundedCornerShape(10.dp),
+                  border = BorderStroke(1.dp, Color(0xFFFECACA)),
+                  modifier = Modifier.fillMaxWidth()
+                ) {
+                  Column(modifier = Modifier.padding(10.dp)) {
+                    Text(
+                      text = DwelloStrings.rejectionReasonTitle(currentLanguage),
+                      style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF991B1B)
+                      )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                      text = property.rejectionReason?.takeIf { it.isNotBlank() }
+                        ?: "Listing rejected by Dwello Homes moderation team.",
+                      style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF7F1D1D))
+                    )
+                  }
+                }
+              }
+
+              Spacer(modifier = Modifier.height(10.dp))
+              Text(
+                text = property.descriptionEn,
+                style = MaterialTheme.typography.bodySmall.copy(
+                  color = DeepNavyText,
+                  lineHeight = 18.sp
+                )
+              )
+              if (property.facilities.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                  text = property.rejectionReason?.takeIf { it.isNotBlank() }
-                    ?: "Listing rejected by Dwello Homes moderation team.",
-                  style = MaterialTheme.typography.bodySmall.copy(color = Color(0xFF7F1D1D))
+                  text = "Facilities: ${property.facilities.joinToString(", ")}",
+                  style = MaterialTheme.typography.labelSmall.copy(
+                    color = NavyTextSecondary,
+                    fontWeight = FontWeight.SemiBold
+                  )
                 )
               }
             }
           }
-
-          Spacer(modifier = Modifier.height(10.dp))
-          Text(
-            text = property.descriptionEn,
-            style = MaterialTheme.typography.bodySmall.copy(
-              color = DeepNavyText,
-              lineHeight = 18.sp
-            )
-          )
-          if (property.facilities.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-              text = "Facilities: ${property.facilities.joinToString(", ")}",
-              style = MaterialTheme.typography.labelSmall.copy(
-                color = NavyTextSecondary,
-                fontWeight = FontWeight.SemiBold
-              )
-            )
+        },
+        confirmButton = {
+          Button(
+            onClick = { onEditClick(property) },
+            colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
+          ) {
+            Text(DwelloStrings.editListingButton(currentLanguage))
+          }
+        },
+        dismissButton = {
+          TextButton(onClick = onDismiss) {
+            Text("Close", color = NavyTextSecondary)
           }
         }
-      }
-    },
-    confirmButton = {
-      Button(
-        onClick = onEditClick,
-        colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
-      ) {
-        Text(DwelloStrings.editListingButton(currentLanguage))
-      }
-    },
-    dismissButton = {
-      TextButton(onClick = onDismiss) {
-        Text("Close", color = NavyTextSecondary)
-      }
+      )
     }
-  )
+  }
 }
 
 @Composable
@@ -1362,9 +1544,13 @@ fun EditPropertyDialog(
     area: String,
     description: String,
     fullAddress: String?,
-    landmark: String?
+    landmark: String?,
+    existingImages: List<PropertyPhotoRecord>,
+    imageIdsToDelete: List<String>,
+    newPhotosToUpload: List<SelectedPhotoItem>
   ) -> Unit
 ) {
+  val context = LocalContext.current
   var title by remember { mutableStateOf(property.titleEn) }
   var priceString by remember { mutableStateOf(property.priceNaira.toString()) }
   var area by remember { mutableStateOf(property.area) }
@@ -1372,8 +1558,50 @@ fun EditPropertyDialog(
   var fullAddress by remember { mutableStateOf(property.fullAddress) }
   var landmark by remember { mutableStateOf(property.landmark) }
 
+  val existingImages = remember(property.id) {
+    if (property.serverImages.isNotEmpty()) {
+      property.serverImages
+    } else {
+      property.photoUris.mapIndexed { idx, url ->
+        PropertyPhotoRecord(id = null, imageKey = null, imageUrl = url, displayOrder = idx)
+      }
+    }
+  }
+  val markedForDeletion = remember(property.id) { mutableStateListOf<String>() }
+  val newlySelectedPhotos = remember(property.id) { mutableStateListOf<SelectedPhotoItem>() }
+  var photoPickerError by remember { mutableStateOf<String?>(null) }
+
+  val addPhotosLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
+  ) { uris: List<Uri> ->
+    if (uris.isNotEmpty()) {
+      var unsupported = false
+      uris.forEach { uri ->
+        val uriStr = uri.toString()
+        val mimeType = runCatching { context.contentResolver.getType(uri) }.getOrNull()
+        if (PropertyPhotoValidator.isSupportedImage(uriStr, mimeType)) {
+          if (newlySelectedPhotos.none { it.uriString == uriStr }) {
+            val label = uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+              ?: "Photo ${newlySelectedPhotos.size + 1}"
+            newlySelectedPhotos.add(
+              SelectedPhotoItem(uriString = uriStr, mimeType = mimeType, fileName = label)
+            )
+          }
+        } else {
+          unsupported = true
+        }
+      }
+      photoPickerError = if (unsupported) {
+        "Some files were skipped. Please select JPG, PNG, WEBP, or HEIC images only."
+      } else {
+        null
+      }
+    }
+  }
+
   AlertDialog(
     onDismissRequest = { if (!isSaving) onDismiss() },
+    modifier = Modifier.testTag("edit_property_dialog"),
     title = {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Edit, contentDescription = null, tint = SkyBluePrimary)
@@ -1509,6 +1737,187 @@ fun EditPropertyDialog(
               unfocusedBorderColor = SoftBlueBorder
             )
           )
+
+          Spacer(modifier = Modifier.height(14.dp))
+
+          Text(
+            text = if (currentLanguage == AppLanguage.ENGLISH) "Property Photos" else "House Pictures",
+            style = MaterialTheme.typography.labelLarge.copy(
+              fontWeight = FontWeight.Bold,
+              color = DeepNavyText
+            )
+          )
+          Spacer(modifier = Modifier.height(6.dp))
+
+          if (existingImages.isNotEmpty()) {
+            LazyRow(
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              modifier = Modifier
+                .fillMaxWidth()
+                .testTag("edit_existing_photos_row")
+            ) {
+              itemsIndexed(existingImages) { idx, record ->
+                val imgId = record.id
+                val isMarkedDelete = imgId != null && markedForDeletion.contains(imgId)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                  Box(
+                    modifier = Modifier
+                      .size(76.dp)
+                      .clip(RoundedCornerShape(10.dp))
+                      .border(
+                        BorderStroke(
+                          1.5.dp,
+                          if (isMarkedDelete) Color(0xFFDC2626) else SoftBlueBorder
+                        ),
+                        RoundedCornerShape(10.dp)
+                      )
+                  ) {
+                    AsyncImage(
+                      model = record.imageUrl,
+                      contentDescription = "Saved photo ${idx + 1}",
+                      placeholder = painterResource(id = property.imageResId),
+                      error = painterResource(id = property.imageResId),
+                      modifier = Modifier.fillMaxSize(),
+                      contentScale = ContentScale.Crop
+                    )
+                    if (isMarkedDelete) {
+                      Box(
+                        modifier = Modifier
+                          .fillMaxSize()
+                          .background(Color(0x99DC2626)),
+                        contentAlignment = Alignment.Center
+                      ) {
+                        Text(
+                          text = "Remove",
+                          color = Color.White,
+                          fontSize = 10.sp,
+                          fontWeight = FontWeight.Bold
+                        )
+                      }
+                    }
+                  }
+                  if (imgId != null) {
+                    TextButton(
+                      onClick = {
+                        if (isMarkedDelete) {
+                          markedForDeletion.remove(imgId)
+                        } else {
+                          markedForDeletion.add(imgId)
+                        }
+                      },
+                      enabled = !isSaving,
+                      modifier = Modifier
+                        .height(48.dp)
+                        .testTag("edit_remove_existing_photo_$idx")
+                    ) {
+                      Text(
+                        text = if (isMarkedDelete) "Undo" else "Remove",
+                        fontSize = 11.sp,
+                        color = if (isMarkedDelete) SkyBluePrimary else Color(0xFFDC2626),
+                        fontWeight = FontWeight.Bold
+                      )
+                    }
+                  }
+                }
+              }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+          }
+
+          if (newlySelectedPhotos.isNotEmpty()) {
+            Text(
+              text = "New Photos to Upload (${newlySelectedPhotos.size})",
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                color = SkyBluePrimary
+              )
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            LazyRow(
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              modifier = Modifier
+                .fillMaxWidth()
+                .testTag("edit_new_photos_row")
+            ) {
+              itemsIndexed(newlySelectedPhotos) { idx, photo ->
+                Box(
+                  modifier = Modifier
+                    .size(76.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, SkyBluePrimary, RoundedCornerShape(10.dp))
+                ) {
+                  AsyncImage(
+                    model = Uri.parse(photo.uriString),
+                    contentDescription = "New photo ${idx + 1}",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                  )
+                  IconButton(
+                    onClick = { newlySelectedPhotos.removeAt(idx) },
+                    enabled = !isSaving,
+                    modifier = Modifier
+                      .align(Alignment.TopEnd)
+                      .size(48.dp)
+                      .testTag("edit_remove_new_photo_$idx")
+                  ) {
+                    Surface(
+                      color = Color(0xCC000000),
+                      shape = CircleShape
+                    ) {
+                      Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Remove selected photo",
+                        tint = Color.White,
+                        modifier = Modifier
+                          .padding(4.dp)
+                          .size(16.dp)
+                      )
+                    }
+                  }
+                }
+              }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+          }
+
+          OutlinedButton(
+            onClick = {
+              addPhotosLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+              )
+            },
+            enabled = !isSaving,
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(48.dp)
+              .testTag("edit_add_photos_button"),
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, SkyBluePrimary)
+          ) {
+            Icon(
+              imageVector = Icons.Default.AddPhotoAlternate,
+              contentDescription = null,
+              tint = SkyBluePrimary,
+              modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+              text = if (currentLanguage == AppLanguage.ENGLISH) "Add Photos" else "Add Pictures",
+              color = SkyBluePrimary,
+              fontWeight = FontWeight.Bold
+            )
+          }
+
+          photoPickerError?.let { err ->
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+              text = err,
+              style = MaterialTheme.typography.labelSmall.copy(
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Bold
+              )
+            )
+          }
         }
       }
     },
@@ -1522,7 +1931,10 @@ fun EditPropertyDialog(
             area.trim().ifBlank { property.area },
             description.trim().ifBlank { property.descriptionEn },
             fullAddress.trim().takeIf { it.isNotEmpty() },
-            landmark.trim().takeIf { it.isNotEmpty() }
+            landmark.trim().takeIf { it.isNotEmpty() },
+            existingImages,
+            markedForDeletion.toList(),
+            newlySelectedPhotos.toList()
           )
         },
         enabled = !isSaving,

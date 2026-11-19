@@ -30,6 +30,19 @@ enum class EnquiryStatus(val apiValue: String) {
   }
 }
 
+data class PropertyPhotoRecord(
+  val id: String? = null,
+  val imageKey: String? = null,
+  val imageUrl: String,
+  val displayOrder: Int = 0
+)
+
+object DwelloSupportConfig {
+  const val SUPPORT_PHONE = "09155259017"
+  const val SUPPORT_TEL_URI = "tel:09155259017"
+  const val SUPPORT_WHATSAPP_URI = "https://wa.me/2349155259017"
+}
+
 data class PropertyItem(
   val id: String,
   val titleEn: String,
@@ -48,7 +61,7 @@ data class PropertyItem(
   val landlordName: String,
   val landlordRoleEn: String = "Property Owner",
   val landlordRolePidgin: String = "House Owner",
-  val phoneContact: String = "0800 393 556",
+  val phoneContact: String = DwelloSupportConfig.SUPPORT_PHONE,
   val descriptionEn: String,
   val descriptionPidgin: String,
   val neighborhoodNote: String,
@@ -57,6 +70,7 @@ data class PropertyItem(
   val imageResId: Int = R.drawable.img_benin_house_exterior,
   val imageResList: List<Int> = listOf(R.drawable.img_benin_house_exterior),
   val photoUris: List<String> = emptyList(),
+  val serverImages: List<PropertyPhotoRecord> = emptyList(),
   val facilities: List<String> = emptyList(),
   val additionalFacilitiesNote: String = "",
   val rentalTerms: String = "1 Year rent advance. Physical inspection coordinated through Dwello Homes.",

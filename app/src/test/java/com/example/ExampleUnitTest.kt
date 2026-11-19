@@ -6,14 +6,19 @@ import com.example.data.AuthFormValidator
 import com.example.data.DwelloApiResult
 import com.example.data.DwelloMappers
 import com.example.data.DwelloRepository
+import com.example.data.DwelloSupportConfig
 import com.example.data.EnquiryItem
 import com.example.data.EnquiryStatus
+import com.example.data.InMemoryPropertyImageDataSource
 import com.example.data.InMemorySessionTokenStore
 import com.example.data.NigerianPhoneNormalizer
+import com.example.data.PreparedUploadImage
 import com.example.data.PropertyApprovalStatus
 import com.example.data.PropertyFormValidator
+import com.example.data.PropertyImageDataSource
 import com.example.data.PropertyItem
 import com.example.data.PropertyPhotoValidator
+import com.example.data.PropertySubmissionResult
 import com.example.data.PropertyTypeSlugMapper
 import com.example.data.RentalPeriod
 import com.example.data.RoleNavigationRouter
@@ -49,6 +54,9 @@ class ExampleUnitTest {
 
   private fun createMockedRepo(
     tokenStore: InMemorySessionTokenStore = InMemorySessionTokenStore(),
+    imageDataSource: PropertyImageDataSource = InMemoryPropertyImageDataSource(
+      fallbackSampleBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte())
+    ),
     handler: (RecordedRequest) -> Pair<Int, String>
   ): Pair<DwelloRepository, MutableList<RecordedRequest>> {
     val recorded = mutableListOf<RecordedRequest>()
@@ -77,7 +85,7 @@ class ExampleUnitTest {
       baseUrl = "https://dwellohomes-api.jimmynathan11.workers.dev/",
       extraInterceptors = listOf(interceptor)
     )
-    return DwelloRepository(apiService, tokenStore) to recorded
+    return DwelloRepository(apiService, tokenStore, imageDataSource) to recorded
   }
 
   @Test
@@ -260,7 +268,7 @@ class ExampleUnitTest {
 
     assertEquals(PropertyApprovalStatus.APPROVED, item.approvalStatus)
     assertEquals("₦650,000", item.priceFormatted)
-    assertEquals("0800 393 556", item.phoneContact) // Intermediary Dwello line only
+    assertEquals("09155259017", item.phoneContact) // Intermediary Dwello line only
     assertEquals(listOf("https://cdn.example.com/1.jpg"), item.photoUris)
     assertTrue(item.hasBorehole)
     assertTrue(item.hasPrepaidMeter)
@@ -796,5 +804,231 @@ class ExampleUnitTest {
 
     val result = repo.getApprovedProperties() as DwelloApiResult.Success
     assertEquals(listOf("p_approved_avail"), result.data.map { it.id })
+  }
+
+  @Test
+  fun testPropertyImageUrlResolutionAndDisplayOrderSorting() {
+    val base = "https://dwellohomes-api.jimmynathan11.workers.dev/"
+    assertEquals(
+      "https://dwellohomes-api.jimmynathan11.workers.dev/api/images/properties%2Fp1%2Ffront.jpg",
+      DwelloMappers.resolvePropertyImageUrl("/api/images/properties%2Fp1%2Ffront.jpg", null, base)
+    )
+    assertEquals(
+      "https://dwellohomes-api.jimmynathan11.workers.dev/api/images/properties%2Fp1%2Ffront.jpg",
+      DwelloMappers.resolvePropertyImageUrl(null, "properties/p1/front.jpg", base)
+    )
+    assertEquals(
+      "https://cdn.example.com/custom.webp",
+      DwelloMappers.resolvePropertyImageUrl("https://cdn.example.com/custom.webp", "properties/p1/ignored.webp", base)
+    )
+
+    val dto = PropertyDto(
+      id = "prop_sort",
+      title = "Sorted House",
+      property_type = "2_bedroom",
+      bedrooms = 2,
+      bathrooms = 2,
+      rent_amount = 500000L,
+      rent_period = "yearly",
+      description = "Nice house",
+      neighbourhood = "GRA",
+      moderation_status = "approved",
+      availability_status = "available",
+      images = listOf(
+        PropertyImageDto(id = "img_2", image_key = "properties/prop_sort/2.jpg", display_order = 2),
+        PropertyImageDto(id = "img_0", image_url = "/api/images/properties%2Fprop_sort%2F0.jpg", display_order = 0),
+        PropertyImageDto(id = "img_1", image_url = "https://dwellohomes-api.jimmynathan11.workers.dev/api/images/properties%2Fprop_sort%2F1.jpg", display_order = 1)
+      )
+    )
+
+    val mapped = with(DwelloMappers) { dto.toPropertyItem(baseUrl = base) }
+    assertEquals(
+      listOf(
+        "https://dwellohomes-api.jimmynathan11.workers.dev/api/images/properties%2Fprop_sort%2F0.jpg",
+        "https://dwellohomes-api.jimmynathan11.workers.dev/api/images/properties%2Fprop_sort%2F1.jpg",
+        "https://dwellohomes-api.jimmynathan11.workers.dev/api/images/properties%2Fprop_sort%2F2.jpg"
+      ),
+      mapped.photoUris
+    )
+    assertEquals(listOf("img_0", "img_1", "img_2"), mapped.serverImages.map { it.id })
+
+    val coverFallbackDto = dto.copy(
+      images = emptyList(),
+      cover_image_url = "/api/images/properties%2Fprop_sort%2Fcover.jpg"
+    )
+    val coverMapped = with(DwelloMappers) { coverFallbackDto.toPropertyItem(baseUrl = base) }
+    assertEquals(
+      listOf("https://dwellohomes-api.jimmynathan11.workers.dev/api/images/properties%2Fprop_sort%2Fcover.jpg"),
+      coverMapped.photoUris
+    )
+  }
+
+  @Test
+  fun testCreatePropertyWithImagesUploadsMultipartSequentiallyAndSupportsRetryWithoutDuplicateProperty() = runBlocking {
+    val tokenStore = InMemorySessionTokenStore().apply {
+      saveSessionToken("landlord-jwt", null)
+    }
+    var uploadAttempt = 0
+    val (repo, requests) = createMockedRepo(tokenStore) { req ->
+      when {
+        req.method == "POST" && req.path == "/api/properties" -> 201 to """
+          {"success": true, "property_id": "prop_img_10", "moderation_status": "pending_approval"}
+        """.trimIndent()
+        req.method == "POST" && req.path == "/api/properties/prop_img_10/images" -> {
+          uploadAttempt++
+          if (uploadAttempt == 2) {
+            500 to """{"error": "Temporary R2 write failure"}"""
+          } else {
+            val order = if (uploadAttempt == 1) 0 else 1
+            201 to """
+              {
+                "success": true,
+                "image": {
+                  "id": "img_$order",
+                  "property_id": "prop_img_10",
+                  "image_key": "properties/prop_img_10/photo_$order.jpg",
+                  "image_url": "/api/images/properties%2Fprop_img_10%2Fphoto_$order.jpg",
+                  "display_order": $order
+                }
+              }
+            """.trimIndent()
+          }
+        }
+        else -> 404 to "{}"
+      }
+    }
+
+    val photos = listOf(
+      SelectedPhotoItem("content://media/1", "image/jpeg", "front.jpg"),
+      SelectedPhotoItem("content://media/2", "image/jpeg", "parlor.jpg")
+    )
+
+    val firstTry = repo.createPropertyWithImages(
+      title = "2 Bedroom in GRA",
+      propertyTypeDisplay = "2 Bedroom",
+      bedrooms = 2,
+      bathrooms = 2,
+      rentAmount = 700000L,
+      rentalPeriod = RentalPeriod.YEARLY,
+      description = "Fenced and gated",
+      neighbourhood = "GRA",
+      fullAddress = "1 Golf Road",
+      landmark = "Golf Course",
+      photos = photos
+    )
+
+    assertTrue(firstTry is PropertySubmissionResult.MetadataSavedUploadFailed)
+    val partial = firstTry as PropertySubmissionResult.MetadataSavedUploadFailed
+    assertEquals("prop_img_10", partial.propertyId)
+    assertEquals(1, partial.uploadedImages.size)
+    assertEquals(1, partial.remainingPhotos.size)
+    assertEquals(1, partial.nextDisplayOrder)
+
+    val retry = repo.uploadRemainingPropertyImages(
+      propertyId = partial.propertyId,
+      photos = partial.remainingPhotos,
+      startDisplayOrder = partial.nextDisplayOrder,
+      alreadyUploaded = partial.uploadedImages
+    )
+
+    assertTrue(retry is PropertySubmissionResult.Success)
+    val done = retry as PropertySubmissionResult.Success
+    assertEquals(2, done.uploadedImages.size)
+    assertEquals(1, requests.count { it.method == "POST" && it.path == "/api/properties" })
+    assertEquals(3, requests.count { it.method == "POST" && it.path == "/api/properties/prop_img_10/images" })
+    assertTrue(requests.filter { it.path == "/api/properties/prop_img_10/images" }.all {
+      it.body.contains("name=\"image\"")
+    })
+  }
+
+  @Test
+  fun testListHydrationAndDeletePropertyImage() = runBlocking {
+    val tokenStore = InMemorySessionTokenStore().apply {
+      saveSessionToken("landlord-jwt", null)
+    }
+    val (repo, requests) = createMockedRepo(tokenStore) { req ->
+      when {
+        req.method == "GET" && req.path == "/api/landlord/properties" -> 200 to """
+          {
+            "success": true,
+            "properties": [
+              {
+                "id": "p_hydrate",
+                "title": "Hydrated Flat",
+                "property_type": "2_bedroom",
+                "bedrooms": 2,
+                "bathrooms": 2,
+                "rent_amount": 500000,
+                "rent_period": "yearly",
+                "description": "Nice",
+                "neighbourhood": "Ugbowo",
+                "moderation_status": "pending_approval",
+                "availability_status": "available"
+              }
+            ]
+          }
+        """.trimIndent()
+        req.method == "GET" && req.path == "/api/properties/p_hydrate" -> 200 to """
+          {
+            "success": true,
+            "property": {
+              "id": "p_hydrate",
+              "title": "Hydrated Flat",
+              "property_type": "2_bedroom",
+              "bedrooms": 2,
+              "bathrooms": 2,
+              "rent_amount": 500000,
+              "rent_period": "yearly",
+              "description": "Nice",
+              "neighbourhood": "Ugbowo",
+              "moderation_status": "pending_approval",
+              "availability_status": "available"
+            },
+            "images": [
+              {"id": "img_10", "image_key": "properties/p_hydrate/ext.jpg", "display_order": 0}
+            ]
+          }
+        """.trimIndent()
+        req.method == "DELETE" && req.path == "/api/properties/p_hydrate/images/img_10" -> 200 to """
+          {"success": true, "message": "Image deleted"}
+        """.trimIndent()
+        else -> 404 to "{}"
+      }
+    }
+
+    val listed = (repo.getLandlordProperties() as DwelloApiResult.Success).data
+    assertEquals(
+      listOf("https://dwellohomes-api.jimmynathan11.workers.dev/api/images/properties%2Fp_hydrate%2Fext.jpg"),
+      listed[0].photoUris
+    )
+    assertEquals("img_10", listed[0].serverImages.first().id)
+
+    val delRes = repo.deletePropertyImage("p_hydrate", "img_10")
+    assertTrue(delRes is DwelloApiResult.Success)
+    assertTrue(requests.any { it.method == "DELETE" && it.path == "/api/properties/p_hydrate/images/img_10" })
+  }
+
+  @Test
+  fun testCustomerSupportContactUsesConfiguredPhoneNumber() {
+    assertEquals("09155259017", DwelloSupportConfig.SUPPORT_PHONE)
+    assertEquals("tel:09155259017", DwelloSupportConfig.SUPPORT_TEL_URI)
+    assertEquals("https://wa.me/2349155259017", DwelloSupportConfig.SUPPORT_WHATSAPP_URI)
+    val defaultProperty = PropertyItem(
+      id = "prop_default",
+      titleEn = "Test Flat",
+      titlePidgin = "Test Flat",
+      categoryEn = "2 Bedroom",
+      categoryPidgin = "2 Bedroom",
+      area = "GRA",
+      priceNaira = 500000L,
+      priceFormatted = "₦500,000",
+      bedrooms = 2,
+      bathrooms = 2,
+      landlordName = "Owner",
+      descriptionEn = "Clean",
+      descriptionPidgin = "Clean",
+      neighborhoodNote = "Quiet"
+    )
+    assertEquals("09155259017", defaultProperty.phoneContact)
   }
 }

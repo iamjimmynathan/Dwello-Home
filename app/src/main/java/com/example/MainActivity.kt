@@ -62,6 +62,7 @@ import com.example.data.AuthAccountRole
 import com.example.data.DwelloRepository
 import com.example.data.DwelloStrings
 import com.example.data.RoleNavigationRouter
+import com.example.network.DwelloNetworkClient
 import com.example.ui.DwelloViewModel
 import com.example.ui.SessionStatus
 import com.example.ui.screens.AccountTypeSelectionScreen
@@ -114,8 +115,13 @@ class MainActivity : ComponentActivity() {
 fun DwelloApp(repository: DwelloRepository? = null) {
   val context = LocalContext.current
   val resolvedRepository = remember(context, repository) {
+    val tokenStore = AndroidKeystoreSessionTokenStore(context.applicationContext)
+    if (repository == null) {
+      DwelloNetworkClient.configureCoilImageLoader(context.applicationContext, tokenStore)
+    }
     repository ?: DwelloRepository.createDefault(
-      AndroidKeystoreSessionTokenStore(context.applicationContext)
+      tokenStore = tokenStore,
+      context = context.applicationContext
     )
   }
 
@@ -533,8 +539,10 @@ fun DwelloApp(repository: DwelloRepository? = null) {
               isSubmitting = uiState.postPropertyLoading,
               submitError = uiState.postPropertyError,
               submittedPropertyId = uiState.postPropertySuccessId,
+              uploadProgressMessage = uiState.postPropertyUploadProgress,
+              pendingUploadPropertyId = uiState.pendingUploadPropertyId,
               onLanguageToggle = ::toggleLanguage,
-              onSubmitProperty = { title, typeDisplay, beds, baths, rent, period, desc, area, address, landmark ->
+              onSubmitProperty = { title, typeDisplay, beds, baths, rent, period, desc, area, address, landmark, selectedPhotos ->
                 dwelloViewModel.createProperty(
                   title = title,
                   propertyTypeDisplay = typeDisplay,
@@ -545,7 +553,8 @@ fun DwelloApp(repository: DwelloRepository? = null) {
                   description = desc,
                   neighbourhood = area,
                   fullAddress = address,
-                  landmark = landmark
+                  landmark = landmark,
+                  selectedPhotos = selectedPhotos
                 )
               },
               onResetSubmitState = { dwelloViewModel.resetPostPropertyState() },
@@ -617,6 +626,7 @@ fun DwelloApp(repository: DwelloRepository? = null) {
               currentUser = authenticatedUser,
               propertiesState = uiState.landlordPropertiesState,
               enquiriesState = uiState.landlordEnquiriesState,
+              selectedPropertyDetailState = uiState.selectedLandlordPropertyDetailState,
               isActionLoading = uiState.landlordActionLoading,
               actionMessage = uiState.landlordActionMessage,
               actionError = uiState.landlordActionError,
@@ -626,7 +636,13 @@ fun DwelloApp(repository: DwelloRepository? = null) {
                 dwelloViewModel.resetPostPropertyState()
                 navigateWithRoleGuard(DwelloNavScreen.POST_HOUSE)
               },
-              onUpdateListing = { propertyId, title, rent, area, desc, address, landmark ->
+              onOpenPropertyDetails = { property ->
+                dwelloViewModel.openLandlordPropertyDetails(property)
+              },
+              onClosePropertyDetails = {
+                dwelloViewModel.closeLandlordPropertyDetails()
+              },
+              onUpdateListing = { propertyId, title, rent, area, desc, address, landmark, existingImages, imageIdsToDelete, newPhotosToUpload ->
                 dwelloViewModel.updatePropertyListing(
                   propertyId = propertyId,
                   title = title,
@@ -634,7 +650,10 @@ fun DwelloApp(repository: DwelloRepository? = null) {
                   neighbourhood = area,
                   description = desc,
                   fullAddress = address,
-                  landmark = landmark
+                  landmark = landmark,
+                  existingImages = existingImages,
+                  imageIdsToDelete = imageIdsToDelete,
+                  newPhotosToUpload = newPhotosToUpload
                 )
               },
               onToggleAvailability = { property ->

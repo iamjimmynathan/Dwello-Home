@@ -1,10 +1,12 @@
 package com.example.data
 
+import android.content.Context
 import com.example.R
 import com.example.network.CreateEnquiryRequest
 import com.example.network.CreatePropertyRequest
 import com.example.network.DwelloApiService
 import com.example.network.DwelloNetworkClient
+import com.example.network.DwelloNetworkConfig
 import com.example.network.EnquiryDto
 import com.example.network.LoginRequest
 import com.example.network.PropertyDto
@@ -13,10 +15,19 @@ import com.example.network.RegisterRequest
 import com.example.network.UpdateAvailabilityRequest
 import com.example.network.UpdateEnquiryStatusRequest
 import com.example.network.UpdatePropertyRequest
+import com.example.network.UploadPropertyImageResponse
 import com.example.network.UserDto
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import retrofit2.Response
 import java.io.IOException
+import java.net.URLEncoder
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -36,6 +47,28 @@ sealed class DwelloApiResult<out T> {
     val httpCode: Int? = null,
     val isUnauthorized: Boolean = false
   ) : DwelloApiResult<Nothing>()
+}
+
+sealed class PropertySubmissionResult {
+  data class Success(
+    val propertyId: String,
+    val uploadedImages: List<PropertyPhotoRecord>,
+    val message: String
+  ) : PropertySubmissionResult()
+
+  data class MetadataSavedUploadFailed(
+    val propertyId: String,
+    val uploadedImages: List<PropertyPhotoRecord>,
+    val remainingPhotos: List<SelectedPhotoItem>,
+    val nextDisplayOrder: Int,
+    val message: String,
+    val isUnauthorized: Boolean = false
+  ) : PropertySubmissionResult()
+
+  data class Failure(
+    val message: String,
+    val isUnauthorized: Boolean = false
+  ) : PropertySubmissionResult()
 }
 
 object PropertyTypeSlugMapper {
@@ -105,7 +138,73 @@ object DwelloMappers {
     return "₦$formatted"
   }
 
-  fun PropertyDto.toPropertyItem(images: List<PropertyImageDto> = emptyList()): PropertyItem {
+  fun encodeImageKeyForRoute(imageKey: String): String {
+    val clean = imageKey.trim()
+      .removePrefix("/")
+      .removePrefix("api/images/")
+    return URLEncoder.encode(clean, "UTF-8").replace("+", "%20")
+  }
+
+  fun resolvePropertyImageUrl(
+    rawUrl: String?,
+    imageKey: String?,
+    baseUrl: String = DwelloNetworkConfig.BASE_URL
+  ): String? {
+    val cleanBase = baseUrl.trimEnd('/')
+    val candidateUrl = rawUrl?.trim()?.takeIf { it.isNotEmpty() }
+    if (candidateUrl != null) {
+      return when {
+        candidateUrl.startsWith("https://", ignoreCase = true) ||
+          candidateUrl.startsWith("http://", ignoreCase = true) -> {
+          candidateUrl.replace(" ", "%20")
+        }
+        candidateUrl.startsWith("/api/", ignoreCase = true) -> {
+          "$cleanBase${candidateUrl.replace(" ", "%20")}"
+        }
+        candidateUrl.startsWith("api/", ignoreCase = true) -> {
+          "$cleanBase/${candidateUrl.replace(" ", "%20")}"
+        }
+        candidateUrl.startsWith("/") -> {
+          "$cleanBase${candidateUrl.replace(" ", "%20")}"
+        }
+        else -> {
+          // Treat non-URL string as an R2 key
+          "$cleanBase/api/images/${encodeImageKeyForRoute(candidateUrl)}"
+        }
+      }
+    }
+
+    val candidateKey = imageKey?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    if (candidateKey.startsWith("https://", ignoreCase = true) ||
+      candidateKey.startsWith("http://", ignoreCase = true)
+    ) {
+      return candidateKey.replace(" ", "%20")
+    }
+    return "$cleanBase/api/images/${encodeImageKeyForRoute(candidateKey)}"
+  }
+
+  fun PropertyImageDto.toPhotoRecordOrNull(
+    fallbackOrder: Int,
+    baseUrl: String = DwelloNetworkConfig.BASE_URL
+  ): PropertyPhotoRecord? {
+    val resolvedUrl = resolvePropertyImageUrl(
+      rawUrl = image_url ?: url,
+      imageKey = image_key,
+      baseUrl = baseUrl
+    ) ?: return null
+
+    return PropertyPhotoRecord(
+      id = id?.takeIf { it.isNotBlank() },
+      imageKey = image_key?.takeIf { it.isNotBlank() },
+      imageUrl = resolvedUrl,
+      displayOrder = display_order ?: fallbackOrder
+    )
+  }
+
+  fun PropertyDto.toPropertyItem(
+    images: List<PropertyImageDto> = emptyList(),
+    baseUrl: String = DwelloNetworkConfig.BASE_URL
+  ): PropertyItem {
     val displayType = PropertyTypeSlugMapper.toDisplayLabel(property_type)
     val period = if (rent_period.equals("monthly", ignoreCase = true)) {
       RentalPeriod.MONTHLY
@@ -137,9 +236,39 @@ object DwelloMappers {
       full_address?.trim()?.takeIf { it.isNotEmpty() }
     ).firstOrNull() ?: if (neighbourhood.isNotBlank()) "$neighbourhood, Benin City" else "Benin City"
 
-    val imageUrls = images.mapNotNull { it.image_url ?: it.url }
-      .map { it.trim() }
-      .filter { it.isNotEmpty() }
+    val rawImageDtos = when {
+      images.isNotEmpty() -> images
+      this.images.isNotEmpty() -> this.images
+      this.property_images.isNotEmpty() -> this.property_images
+      else -> emptyList()
+    }
+
+    val orderedRecords = rawImageDtos
+      .withIndex()
+      .sortedWith(compareBy({ it.value.display_order ?: Int.MAX_VALUE }, { it.index }))
+      .mapNotNull { (idx, dto) -> dto.toPhotoRecordOrNull(fallbackOrder = idx, baseUrl = baseUrl) }
+      .distinctBy { it.imageUrl }
+      .ifEmpty {
+        val coverUrl = resolvePropertyImageUrl(
+          rawUrl = cover_image_url ?: primary_image_url ?: image_url ?: thumbnail_url,
+          imageKey = cover_image_key ?: image_key,
+          baseUrl = baseUrl
+        )
+        if (coverUrl != null) {
+          listOf(
+            PropertyPhotoRecord(
+              id = null,
+              imageKey = cover_image_key ?: image_key,
+              imageUrl = coverUrl,
+              displayOrder = 0
+            )
+          )
+        } else {
+          emptyList()
+        }
+      }
+
+    val imageUrls = orderedRecords.map { it.imageUrl }
 
     val fallbackRes = when (property_type.lowercase(Locale.ROOT)) {
       "duplex", "detached_house", "3_bedroom" -> R.drawable.img_benin_house_modern_1794407034302
@@ -168,7 +297,7 @@ object DwelloMappers {
       landlordName = landlord_name?.trim()?.takeIf { it.isNotEmpty() } ?: "Verified Property Owner",
       landlordRoleEn = "Property Owner",
       landlordRolePidgin = "House Owner",
-      phoneContact = "0800 393 556", // Private landlord phone is never exposed to tenants
+      phoneContact = DwelloSupportConfig.SUPPORT_PHONE, // Private landlord phone is never exposed to tenants
       descriptionEn = description,
       descriptionPidgin = description,
       neighborhoodNote = note,
@@ -177,6 +306,7 @@ object DwelloMappers {
       imageResId = fallbackRes,
       imageResList = listOf(fallbackRes),
       photoUris = imageUrls,
+      serverImages = orderedRecords,
       facilities = buildList {
         if (description.contains("water", ignoreCase = true)) add("Water")
         if (description.contains("borehole", ignoreCase = true)) add("Borehole")
@@ -226,7 +356,8 @@ object DwelloMappers {
 
 open class DwelloRepository(
   private val apiService: DwelloApiService,
-  private val tokenStore: SessionTokenStore
+  private val tokenStore: SessionTokenStore,
+  private val imageDataSource: PropertyImageDataSource = InMemoryPropertyImageDataSource()
 ) {
 
   fun hasStoredSession(): Boolean {
@@ -302,8 +433,6 @@ open class DwelloRepository(
       when (regResult) {
         is DwelloApiResult.Error -> regResult
         is DwelloApiResult.Success -> {
-          // Live API /api/auth/register creates the user without returning a token;
-          // immediately log in to obtain and encrypt the Bearer session token.
           loginInternal(normalizedPhone, passwordStr)
         }
       }
@@ -373,7 +502,7 @@ open class DwelloRepository(
   }
 
   suspend fun getApprovedProperties(): DwelloApiResult<List<PropertyItem>> {
-    return safeApiCall(
+    val listResult = safeApiCall(
       call = { apiService.getApprovedProperties() },
       onSuccess = { body ->
         val mapped = body.properties
@@ -382,6 +511,12 @@ open class DwelloRepository(
         DwelloApiResult.Success(mapped, body.message)
       }
     )
+    return when (listResult) {
+      is DwelloApiResult.Success -> {
+        DwelloApiResult.Success(hydrateMissingImagesIfNeeded(listResult.data), listResult.message)
+      }
+      is DwelloApiResult.Error -> listResult
+    }
   }
 
   suspend fun getPropertyDetails(propertyId: String): DwelloApiResult<PropertyItem> {
@@ -400,13 +535,19 @@ open class DwelloRepository(
   }
 
   suspend fun getFavourites(): DwelloApiResult<List<PropertyItem>> {
-    return safeApiCall(
+    val favResult = safeApiCall(
       call = { apiService.getFavourites() },
       onSuccess = { body ->
         val mapped = body.properties.map { with(DwelloMappers) { it.toPropertyItem() } }
         DwelloApiResult.Success(mapped, body.message)
       }
     )
+    return when (favResult) {
+      is DwelloApiResult.Success -> {
+        DwelloApiResult.Success(hydrateMissingImagesIfNeeded(favResult.data), favResult.message)
+      }
+      is DwelloApiResult.Error -> favResult
+    }
   }
 
   suspend fun addFavourite(propertyId: String): DwelloApiResult<String> {
@@ -491,22 +632,268 @@ open class DwelloRepository(
         )
       },
       onSuccess = { body ->
-        DwelloApiResult.Success(
-          data = body.property_id ?: "",
-          message = body.message ?: "Property submitted for Dwello Homes review."
-        )
+        val propId = body.property_id?.trim().orEmpty()
+        if (propId.isEmpty()) {
+          DwelloApiResult.Error(body.message ?: "Server created property without returning a property ID.")
+        } else {
+          DwelloApiResult.Success(
+            data = propId,
+            message = body.message ?: "Property submitted for Dwello Homes review."
+          )
+        }
       }
     )
   }
 
-  suspend fun getLandlordProperties(): DwelloApiResult<List<PropertyItem>> {
+  suspend fun createPropertyWithImages(
+    title: String,
+    propertyTypeDisplay: String,
+    bedrooms: Int,
+    bathrooms: Int,
+    rentAmount: Long,
+    rentalPeriod: RentalPeriod,
+    description: String,
+    neighbourhood: String,
+    fullAddress: String,
+    landmark: String?,
+    photos: List<SelectedPhotoItem>,
+    onUploadProgress: (currentIndex: Int, total: Int) -> Unit = { _, _ -> }
+  ): PropertySubmissionResult {
+    val createResult = createProperty(
+      title = title,
+      propertyTypeDisplay = propertyTypeDisplay,
+      bedrooms = bedrooms,
+      bathrooms = bathrooms,
+      rentAmount = rentAmount,
+      rentalPeriod = rentalPeriod,
+      description = description,
+      neighbourhood = neighbourhood,
+      fullAddress = fullAddress,
+      landmark = landmark
+    )
+
+    val propertyId = when (createResult) {
+      is DwelloApiResult.Error -> {
+        return PropertySubmissionResult.Failure(
+          message = createResult.message,
+          isUnauthorized = createResult.isUnauthorized
+        )
+      }
+      is DwelloApiResult.Success -> createResult.data
+    }
+
+    if (photos.isEmpty()) {
+      return PropertySubmissionResult.Success(
+        propertyId = propertyId,
+        uploadedImages = emptyList(),
+        message = createResult.message ?: "Property submitted for Dwello Homes review."
+      )
+    }
+
+    return uploadRemainingPropertyImages(
+      propertyId = propertyId,
+      photos = photos,
+      startDisplayOrder = 0,
+      alreadyUploaded = emptyList(),
+      successMessage = createResult.message ?: "Property and photos submitted for Dwello Homes review.",
+      onUploadProgress = onUploadProgress
+    )
+  }
+
+  suspend fun uploadRemainingPropertyImages(
+    propertyId: String,
+    photos: List<SelectedPhotoItem>,
+    startDisplayOrder: Int = 0,
+    alreadyUploaded: List<PropertyPhotoRecord> = emptyList(),
+    successMessage: String = "Property photos uploaded successfully.",
+    onUploadProgress: (currentIndex: Int, total: Int) -> Unit = { _, _ -> }
+  ): PropertySubmissionResult {
+    val uploaded = alreadyUploaded.toMutableList()
+    photos.forEachIndexed { idx, photo ->
+      val order = startDisplayOrder + idx
+      onUploadProgress(idx + 1, photos.size)
+      when (val uploadRes = uploadSinglePropertyImage(propertyId, photo, order)) {
+        is DwelloApiResult.Success -> uploaded.add(uploadRes.data)
+        is DwelloApiResult.Error -> {
+          return PropertySubmissionResult.MetadataSavedUploadFailed(
+            propertyId = propertyId,
+            uploadedImages = uploaded.toList(),
+            remainingPhotos = photos.drop(idx),
+            nextDisplayOrder = order,
+            message = uploadRes.message,
+            isUnauthorized = uploadRes.isUnauthorized
+          )
+        }
+      }
+    }
+    return PropertySubmissionResult.Success(
+      propertyId = propertyId,
+      uploadedImages = uploaded.toList(),
+      message = successMessage
+    )
+  }
+
+  suspend fun uploadPropertyImages(
+    propertyId: String,
+    photos: List<SelectedPhotoItem>,
+    startDisplayOrder: Int = 0,
+    onUploadProgress: (currentIndex: Int, total: Int) -> Unit = { _, _ -> }
+  ): DwelloApiResult<List<PropertyPhotoRecord>> {
+    val uploaded = mutableListOf<PropertyPhotoRecord>()
+    photos.forEachIndexed { idx, photo ->
+      onUploadProgress(idx + 1, photos.size)
+      when (val res = uploadSinglePropertyImage(propertyId, photo, startDisplayOrder + idx)) {
+        is DwelloApiResult.Success -> uploaded.add(res.data)
+        is DwelloApiResult.Error -> return res
+      }
+    }
+    return DwelloApiResult.Success(uploaded)
+  }
+
+  suspend fun uploadSinglePropertyImage(
+    propertyId: String,
+    photo: SelectedPhotoItem,
+    displayOrder: Int
+  ): DwelloApiResult<PropertyPhotoRecord> {
+    val preparedResult = imageDataSource.readImageForUpload(photo, displayOrder)
+    val prepared = preparedResult.getOrElse { err ->
+      return DwelloApiResult.Error(
+        err.message ?: "Unable to read selected image file for upload."
+      )
+    }
+
+    val primary = executeUploadCall(propertyId, prepared, displayOrder, partFieldName = "image")
+    if (primary is DwelloApiResult.Error && primary.httpCode == 400) {
+      val msgLower = primary.message.lowercase(Locale.ROOT)
+      val alternateField = when {
+        msgLower.contains("images") -> "images"
+        msgLower.contains("file") -> "file"
+        else -> null
+      }
+      if (alternateField != null) {
+        return executeUploadCall(propertyId, prepared, displayOrder, partFieldName = alternateField)
+      }
+    }
+    return primary
+  }
+
+  private suspend fun executeUploadCall(
+    propertyId: String,
+    prepared: PreparedUploadImage,
+    displayOrder: Int,
+    partFieldName: String
+  ): DwelloApiResult<PropertyPhotoRecord> {
+    val mediaType = prepared.mimeType.toMediaTypeOrNull() ?: "image/jpeg".toMediaType()
+    val fileBody = prepared.bytes.toRequestBody(mediaType)
+    val part = MultipartBody.Part.createFormData(partFieldName, prepared.fileName, fileBody)
+    val orderBody = displayOrder.toString().toRequestBody("text/plain".toMediaType())
+
     return safeApiCall(
+      call = { apiService.uploadPropertyImage(propertyId = propertyId, image = part, displayOrder = orderBody) },
+      onSuccess = { body ->
+        val record = extractUploadedPhotoRecord(body, displayOrder)
+        if (record == null) {
+          DwelloApiResult.Error(
+            body.message ?: body.error ?: "Image upload succeeded without a valid image URL or key."
+          )
+        } else {
+          DwelloApiResult.Success(record, body.message ?: "Image uploaded.")
+        }
+      }
+    )
+  }
+
+  private fun extractUploadedPhotoRecord(
+    body: UploadPropertyImageResponse,
+    fallbackDisplayOrder: Int
+  ): PropertyPhotoRecord? {
+    val nested = body.image ?: body.images.firstOrNull()
+    if (nested != null) {
+      val mapped = with(DwelloMappers) { nested.toPhotoRecordOrNull(fallbackDisplayOrder) }
+      if (mapped != null) return mapped
+    }
+    val directDto = PropertyImageDto(
+      id = body.id,
+      property_id = body.property_id,
+      image_key = body.image_key,
+      image_url = body.image_url,
+      url = body.url,
+      display_order = body.display_order ?: fallbackDisplayOrder,
+      created_at = body.created_at
+    )
+    return with(DwelloMappers) { directDto.toPhotoRecordOrNull(fallbackDisplayOrder) }
+  }
+
+  suspend fun deletePropertyImage(
+    propertyId: String,
+    imageId: String
+  ): DwelloApiResult<Unit> {
+    return safeApiCall(
+      call = { apiService.deletePropertyImage(propertyId, imageId) },
+      onSuccess = { body -> DwelloApiResult.Success(Unit, body.message) }
+    )
+  }
+
+  suspend fun getLandlordProperties(): DwelloApiResult<List<PropertyItem>> {
+    val listResult = safeApiCall(
       call = { apiService.getLandlordProperties() },
       onSuccess = { body ->
         val mapped = body.properties.map { with(DwelloMappers) { it.toPropertyItem() } }
         DwelloApiResult.Success(mapped, body.message)
       }
     )
+    return when (listResult) {
+      is DwelloApiResult.Success -> {
+        DwelloApiResult.Success(hydrateMissingImagesIfNeeded(listResult.data), listResult.message)
+      }
+      is DwelloApiResult.Error -> listResult
+    }
+  }
+
+  private suspend fun hydrateMissingImagesIfNeeded(items: List<PropertyItem>): List<PropertyItem> {
+    if (items.none { it.photoUris.isEmpty() }) return items
+    return coroutineScope {
+      items.map { item ->
+        if (item.photoUris.isNotEmpty()) {
+          async { item }
+        } else {
+          async {
+            val detail = runCatching { apiService.getPropertyById(item.id) }.getOrNull()
+            val body = if (detail?.isSuccessful == true) detail.body() else null
+            val detailProp = body?.property
+            if (detailProp != null) {
+              val hydrated = with(DwelloMappers) { detailProp.toPropertyItem(body.images) }
+              if (hydrated.photoUris.isNotEmpty()) {
+                item.copy(
+                  photoUris = hydrated.photoUris,
+                  serverImages = hydrated.serverImages
+                )
+              } else {
+                item
+              }
+            } else if (body != null && body.images.isNotEmpty()) {
+              val ordered = body.images
+                .withIndex()
+                .sortedWith(compareBy({ it.value.display_order ?: Int.MAX_VALUE }, { it.index }))
+                .mapNotNull { (idx, dto) ->
+                  with(DwelloMappers) { dto.toPhotoRecordOrNull(idx) }
+                }
+                .distinctBy { it.imageUrl }
+              if (ordered.isNotEmpty()) {
+                item.copy(
+                  photoUris = ordered.map { it.imageUrl },
+                  serverImages = ordered
+                )
+              } else {
+                item
+              }
+            } else {
+              item
+            }
+          }
+        }
+      }.awaitAll()
+    }
   }
 
   suspend fun updateProperty(
@@ -640,9 +1027,21 @@ open class DwelloRepository(
   }
 
   companion object {
-    fun createDefault(tokenStore: SessionTokenStore): DwelloRepository {
+    fun createDefault(
+      tokenStore: SessionTokenStore,
+      context: Context? = null
+    ): DwelloRepository {
       val apiService = DwelloNetworkClient.createApiService(tokenStore = tokenStore)
-      return DwelloRepository(apiService = apiService, tokenStore = tokenStore)
+      val imageSource = if (context != null) {
+        AndroidContentResolverImageDataSource(context.applicationContext)
+      } else {
+        InMemoryPropertyImageDataSource()
+      }
+      return DwelloRepository(
+        apiService = apiService,
+        tokenStore = tokenStore,
+        imageDataSource = imageSource
+      )
     }
   }
 }

@@ -402,8 +402,13 @@ object DwelloStrings {
   }
 
   fun localPhotoNotice(lang: AppLanguage): String = when (lang) {
-    AppLanguage.ENGLISH -> "Honest Notice: Selected photos are previewed locally on your device for this submission."
-    AppLanguage.PIDGIN -> "Honest Notice: Pictures dey save for your phone here for now."
+    AppLanguage.ENGLISH -> "Selected photos are uploaded securely to Dwello Homes storage when you submit your property."
+    AppLanguage.PIDGIN -> "Pictures wey you pick go upload enter Dwello Homes server when you submit your house."
+  }
+
+  fun retryPhotoUploadBtn(lang: AppLanguage): String = when (lang) {
+    AppLanguage.ENGLISH -> "Retry Photo Upload"
+    AppLanguage.PIDGIN -> "Try Upload Pictures Again"
   }
 
   // Property Details

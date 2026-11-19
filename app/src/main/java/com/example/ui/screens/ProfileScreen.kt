@@ -55,6 +55,7 @@ import com.example.data.AppLanguage
 import com.example.data.AuthAccountRole
 import com.example.data.AuthenticatedUser
 import com.example.data.DwelloStrings
+import com.example.data.DwelloSupportConfig
 import com.example.data.EnquiryItem
 import com.example.data.PropertyApprovalStatus
 import com.example.data.PropertyItem
@@ -630,12 +631,13 @@ fun ProfileScreen(
 
             Button(
               onClick = {
-                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:0800393556"))
+                val intent = Intent(Intent.ACTION_DIAL, Uri.parse(DwelloSupportConfig.SUPPORT_TEL_URI))
                 context.startActivity(intent)
               },
               modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
+                .height(48.dp)
+                .testTag("profile_call_support_button"),
               colors = ButtonDefaults.buttonColors(
                 containerColor = SkyBluePrimary,
                 contentColor = Color.White
@@ -645,7 +647,7 @@ fun ProfileScreen(
               Icon(imageVector = Icons.Default.Call, contentDescription = null, tint = Color.White)
               Spacer(modifier = Modifier.width(8.dp))
               Text(
-                text = "0800-393-556 (Toll-Free Benin)",
+                text = "${DwelloSupportConfig.SUPPORT_PHONE} (Benin Support)",
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
               )
             }
